@@ -412,7 +412,7 @@ export default function Dashboard() {
                 Chat
               </Typography>
             </Box>
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/profile')}>
               <IconButton sx={{ color: '#94a3b8' }}>
                 <Person />
               </IconButton>

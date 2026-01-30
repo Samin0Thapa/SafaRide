@@ -9,6 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import CreateRide from "./pages/CreateRide";
 import JoinRide from "./pages/JoinRide";
 import RideDetails from "./pages/RideDetails"; 
+import Profile from "./pages/Profile";
+import TrustVerification from "./pages/TrustVerification.jsx";
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
           <Route path="/create-ride" element={<CreateRide />} />
           <Route path="/join-ride" element={<JoinRide />} />
           <Route path="/ride-details/:rideId" element={<RideDetails />} /> 
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/become-organizer" element={<TrustVerification />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
