@@ -394,7 +394,9 @@ export default function Dashboard() {
                 Home
               </Typography>
             </Box>
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: 'center' }}
+              onClick={() => navigate('/join-ride')}
+            >
               <IconButton sx={{ color: '#94a3b8' }}>
                 <DirectionsBike />
               </IconButton>
