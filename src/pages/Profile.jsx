@@ -71,13 +71,12 @@ export default function Profile() {
   };
 
   const fetchRecentRides = async () => {
-    try {
-      const ridesQuery = query(
-        collection(db, 'rides'),
-        where('participants', 'array-contains', user.uid),
-        orderBy('createdAt', 'desc'),
-        limit(3)
-      );
+  try {
+    const ridesQuery = query(
+      collection(db, 'rides'),
+      where('participants', 'array-contains', user.uid),
+      limit(3)  
+    );
       
       const snapshot = await getDocs(ridesQuery);
       const rides = [];

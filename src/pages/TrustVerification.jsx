@@ -61,19 +61,6 @@ export default function TrustVerification() {
     }
   };
 
-  const handleRequestVerification = async () => {
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        verificationRequested: true,
-        requestedAt: new Date().toISOString(),
-      });
-      alert('Verification request submitted! Our team will review your profile.');
-    } catch (error) {
-      console.error('Error requesting verification:', error);
-      alert('Failed to submit request. Please try again.');
-    }
-  };
-
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -446,7 +433,7 @@ export default function TrustVerification() {
           fullWidth
           variant="contained"
           size="large"
-          onClick={handleRequestVerification}
+          onClick={() => navigate('/verification-form')}
           sx={{
             bgcolor: '#7c3aed',
             color: 'white',

@@ -8,9 +8,10 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import CreateRide from "./pages/CreateRide";
 import JoinRide from "./pages/JoinRide";
-import RideDetails from "./pages/RideDetails"; 
+import RideDetails from "./pages/RideDetails";
 import Profile from "./pages/Profile";
-import TrustVerification from "./pages/TrustVerification.jsx";
+import TrustVerification from "./pages/TrustVerification";
+import OrganizerVerificationForm from "./pages/OrganizerVerificationForm";
 
 function App() {
   return (
@@ -24,9 +25,10 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-ride" element={<CreateRide />} />
           <Route path="/join-ride" element={<JoinRide />} />
-          <Route path="/ride-details/:rideId" element={<RideDetails />} /> 
+          <Route path="/ride-details/:rideId" element={<RideDetails />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/become-organizer" element={<TrustVerification />} />
+          <Route path="/verification-form" element={<OrganizerVerificationForm />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
