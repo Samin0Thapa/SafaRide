@@ -75,10 +75,11 @@ export default function OrganizerVerificationForm() {
       return;
     }
 
-    if (!idDocument) {
-      setError('Please upload your ID document');
-      return;
-    }
+    // COMMENTED OUT FOR NOW - Will enable after Blaze upgrade
+    // if (!idDocument) {
+    //   setError('Please upload your ID document');
+    //   return;
+    // }
 
     if (!user) {
       setError('You must be logged in to submit this application');
@@ -89,10 +90,10 @@ export default function OrganizerVerificationForm() {
     setError('');
 
     try {
-      // Upload ID document to Firebase Storage
-      const storageRef = ref(storage, `verification-documents/${user.uid}/${idDocument.name}`);
-      await uploadBytes(storageRef, idDocument);
-      const documentURL = await getDownloadURL(storageRef);
+      // COMMENTED OUT - File upload (requires Firebase Blaze plan)
+      // const storageRef = ref(storage, `verification-documents/${user.uid}/${idDocument.name}`);
+      // await uploadBytes(storageRef, idDocument);
+      // const documentURL = await getDownloadURL(storageRef);
 
       // Create verification request in Firestore
       const verificationData = {
@@ -104,7 +105,7 @@ export default function OrganizerVerificationForm() {
         licenseNumber: formData.licenseNumber,
         motorcycleModel: formData.motorcycleModel,
         reason: formData.reason,
-        documentURL: documentURL,
+        documentURL: idDocument ? idDocument.name : 'Document upload pending', // Temporary placeholder
         status: 'pending',
         createdAt: serverTimestamp(),
       };
@@ -118,6 +119,7 @@ export default function OrganizerVerificationForm() {
       
     } catch (error) {
       console.error('Error submitting verification request:', error);
+      console.error('Error message:', error.message);
       setError('Failed to submit application. Please try again.');
     } finally {
       setLoading(false);
@@ -465,7 +467,7 @@ export default function OrganizerVerificationForm() {
               {/* ID Document Upload */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                  ID Document Upload
+                  ID Document Upload (Optional for now)
                 </Typography>
                 <Box
                   sx={{

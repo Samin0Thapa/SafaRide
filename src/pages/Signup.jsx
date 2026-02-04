@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 import {
   Box,
   Container,
@@ -52,7 +53,7 @@ export default function Signup() {
     }
 
     try {
-      // Create user with Firebase
+      // Create user with Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
@@ -64,12 +65,22 @@ export default function Signup() {
         displayName: formData.fullName,
       });
 
+      // Store user data in Firestore with role
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        uid: userCredential.user.uid,
+        name: formData.fullName,
+        email: formData.email,
+        role: 'rider', // Default role
+        verified: false,
+        createdAt: serverTimestamp(),
+      });
+
       // Send verification email
       await sendEmailVerification(userCredential.user);
 
       console.log('Signup successful:', userCredential.user);
 
-      // Show success dialog instead of redirecting immediately
+      // Show success dialog
       setShowSuccessDialog(true);
 
     } catch (error) {

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 import {
   Box,
   Container,
@@ -49,8 +50,22 @@ export default function Login() {
       
       console.log('Login successful:', userCredential.user);
       
-      // Redirect to dashboard after successful login
-      navigate('/dashboard');
+      // Fetch user data from Firestore to check role
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // Redirect based on role
+        if (userData.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        // If no user document exists (old users), just go to dashboard
+        navigate('/dashboard');
+      }
       
     } catch (error) {
       console.error('Login error:', error);
@@ -233,5 +248,5 @@ export default function Login() {
         </Box>
       </Container>
     </Box>
-  );a
+  );
 }
