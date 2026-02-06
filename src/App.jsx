@@ -12,6 +12,8 @@ import RideDetails from "./pages/RideDetails";
 import Profile from "./pages/Profile";
 import TrustVerification from "./pages/TrustVerification";
 import OrganizerVerificationForm from "./pages/OrganizerVerificationForm";
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
@@ -29,6 +31,16 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/become-organizer" element={<TrustVerification />} />
           <Route path="/verification-form" element={<OrganizerVerificationForm />} />
+          
+          {/* ADMIN ROUTE */}
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminDashboard />
+              </ProtectedAdminRoute>
+            } 
+          />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
