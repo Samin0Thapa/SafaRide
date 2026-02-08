@@ -502,7 +502,7 @@ export default function Dashboard() {
           >
             <VerifiedUser sx={{ fontSize: 50, color: '#7c3aed' }} />
           </Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
             Organizer Verification Required
           </Typography>
         </DialogTitle>
