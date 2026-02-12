@@ -322,7 +322,7 @@ export default function Dashboard() {
               transition: 'transform 0.2s',
               '&:hover': { transform: 'translateY(-2px)' },
             }}
-            onClick={() => alert('Emergency Contacts - Coming Soon!')}
+            onClick={() => navigate('/emergency-contacts')}  
           >
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -345,7 +345,7 @@ export default function Dashboard() {
                       Emergency SOS
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.85rem' }}>
-                      Activate emergency alert
+                      Set up emergency contacts  
                     </Typography>
                   </Box>
                 </Box>
