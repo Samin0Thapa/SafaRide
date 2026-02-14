@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import {
   Box,
@@ -17,6 +17,8 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  CircularProgress,
+  Chip,
 } from '@mui/material';
 import {
   Add,
@@ -31,13 +33,27 @@ import {
   ArrowForward,
   Logout,
   VerifiedUser,
+  CalendarToday,
+  Schedule,
+  Warning,
 } from '@mui/icons-material';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const user = auth.currentUser;
+  const [user, setUser] = useState(null);
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
   const [userRole, setUserRole] = useState(null);
+  const [ongoingRides, setOngoingRides] = useState([]);
+  const [loadingRides, setLoadingRides] = useState(true);
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Fetch user role on component mount
   useEffect(() => {
@@ -56,6 +72,49 @@ export default function Dashboard() {
     fetchUserRole();
   }, [user]);
 
+  // Fetch ongoing rides where user is a participant
+  useEffect(() => {
+    const fetchOngoingRides = async () => {
+      if (!user) {
+        setLoadingRides(false);
+        return;
+      }
+
+      try {
+        setLoadingRides(true);
+        
+        // Query rides where status is 'ongoing'
+        const ridesQuery = query(
+          collection(db, 'rides'),
+          where('status', '==', 'ongoing')
+        );
+
+        const querySnapshot = await getDocs(ridesQuery);
+        const ridesData = [];
+
+        querySnapshot.forEach((doc) => {
+          const rideData = { id: doc.id, ...doc.data() };
+          
+          // Check if current user is a participant OR the organizer
+          const isParticipant = rideData.participants?.some(p => p.userId === user.uid);
+          const isOrganizer = rideData.createdBy === user.uid;
+          
+          if (isParticipant || isOrganizer) {
+            ridesData.push(rideData);
+          }
+        });
+
+        setOngoingRides(ridesData);
+      } catch (error) {
+        console.error('Error fetching ongoing rides:', error);
+      } finally {
+        setLoadingRides(false);
+      }
+    };
+
+    fetchOngoingRides();
+  }, [user]);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -67,19 +126,33 @@ export default function Dashboard() {
 
   const handleCreateRideClick = async () => {
     try {
-      // Fetch user role from Firestore
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const role = userDoc.data()?.role;
 
       if (role === 'rider') {
-        // Show verification required dialog
         setShowVerificationDialog(true);
       } else if (role === 'organizer' || role === 'admin') {
-        // Allow create ride
         navigate('/create-ride');
       }
     } catch (error) {
       console.error('Error checking user role:', error);
+    }
+  };
+
+  const handleSOSClick = (rideId) => {
+    // Navigate to SOS page or trigger SOS
+    alert('SOS functionality - Coming soon!');
+  };
+
+  const formatTime = (timeString) => {
+    try {
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm}`;
+    } catch (e) {
+      return timeString;
     }
   };
 
@@ -311,7 +384,7 @@ export default function Dashboard() {
             </Card>
           </Box>
 
-          {/* Emergency Contacts Card */}
+          {/* Emergency SOS Card */}
           <Card
             sx={{
               borderRadius: 4,
@@ -322,7 +395,7 @@ export default function Dashboard() {
               transition: 'transform 0.2s',
               '&:hover': { transform: 'translateY(-2px)' },
             }}
-            onClick={() => navigate('/emergency-contacts')}  
+            onClick={() => navigate('/emergency-contacts')}
           >
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -345,7 +418,7 @@ export default function Dashboard() {
                       Emergency SOS
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.85rem' }}>
-                      Set up emergency contacts  
+                      Set up emergency contacts
                     </Typography>
                   </Box>
                 </Box>
@@ -397,30 +470,159 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Rides Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              Recent Rides
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                color: '#7c3aed',
-                fontWeight: 600,
-                cursor: 'pointer',
-                '&:hover': { textDecoration: 'underline' },
-              }}
-            >
-              View All
-            </Typography>
-          </Box>
+          {/* Ongoing Rides Section */}
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                Ongoing Rides
+              </Typography>
+              {ongoingRides.length > 0 && (
+                <Chip
+                  label={`${ongoingRides.length} Active`}
+                  size="small"
+                  sx={{
+                    bgcolor: '#dcfce7',
+                    color: '#059669',
+                    fontWeight: 600,
+                  }}
+                />
+              )}
+            </Box>
 
-          {/* Placeholder for rides */}
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <DirectionsBike sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              No recent rides yet
-            </Typography>
+            {/* Loading State */}
+            {loadingRides && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress sx={{ color: '#7c3aed' }} />
+              </Box>
+            )}
+
+            {/* Empty State */}
+            {!loadingRides && ongoingRides.length === 0 && (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <DirectionsBike sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
+                <Typography variant="body1" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>
+                  No ongoing rides
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                  Join a ride to see it here!
+                </Typography>
+              </Box>
+            )}
+
+            {/* Ongoing Rides List */}
+            {!loadingRides && ongoingRides.length > 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {ongoingRides.map((ride) => (
+                  <Card
+                    key={ride.id}
+                    sx={{
+                      borderRadius: 4,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      border: '2px solid #10b981',
+                    }}
+                  >
+                    <CardContent sx={{ p: 2.5 }}>
+                      {/* Ride Title and Status */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                        <Box>
+                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+                            {ride.title}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+                            {ride.meetingPoint} → {ride.destination}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label="LIVE"
+                          size="small"
+                          sx={{
+                            bgcolor: '#10b981',
+                            color: 'white',
+                            fontWeight: 700,
+                            fontSize: '0.7rem',
+                            animation: 'pulse 2s infinite',
+                            '@keyframes pulse': {
+                              '0%, 100%': { opacity: 1 },
+                              '50%': { opacity: 0.7 },
+                            },
+                          }}
+                        />
+                      </Box>
+
+                      {/* Date, Time, Participants */}
+                      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <CalendarToday sx={{ fontSize: 14, color: '#7c3aed' }} />
+                          <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+                            {ride.date}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Schedule sx={{ fontSize: 14, color: '#7c3aed' }} />
+                          <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+                            {formatTime(ride.time)}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Person sx={{ fontSize: 14, color: '#7c3aed' }} />
+                          <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+                            {ride.participants?.length || 0} riders
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Action Buttons */}
+                      <Box sx={{ display: 'flex', gap: 1.5 }}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={() => navigate(`/ride-details/${ride.id}`)}
+                          sx={{
+                            color: '#7c3aed',
+                            borderColor: '#7c3aed',
+                            py: 1.2,
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            borderRadius: 3,
+                            borderWidth: 2,
+                            '&:hover': {
+                              borderColor: '#6d28d9',
+                              bgcolor: 'transparent',
+                              borderWidth: 2,
+                            },
+                          }}
+                        >
+                          View Details
+                        </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={<Warning />}
+                          onClick={() => handleSOSClick(ride.id)}
+                          sx={{
+                            bgcolor: '#ef4444',
+                            color: 'white',
+                            py: 1.2,
+                            px: 2.5,
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            textTransform: 'none',
+                            borderRadius: 3,
+                            boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
+                            '&:hover': {
+                              bgcolor: '#dc2626',
+                              boxShadow: '0 6px 16px rgba(239,68,68,0.4)',
+                            },
+                          }}
+                        >
+                          SOS
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            )}
           </Box>
         </Box>
       </Container>

@@ -25,6 +25,9 @@ import {
   FilterList,
   CheckCircle,
   ArrowForward,
+  Chat,
+  Home,
+  Badge as BadgeIcon,
 } from '@mui/icons-material';
 
 export default function JoinRide() {
@@ -64,15 +67,29 @@ export default function JoinRide() {
       setLoading(true);
       setError('');
       
-      const ridesQuery = query(
+      // Fetch both upcoming AND ongoing rides
+      const ridesData = [];
+      
+      // Get upcoming rides
+      const upcomingQuery = query(
         collection(db, 'rides'),
         where('status', '==', 'upcoming')
       );
+      const upcomingSnapshot = await getDocs(upcomingQuery);
+      upcomingSnapshot.forEach((doc) => {
+        ridesData.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
 
-      const querySnapshot = await getDocs(ridesQuery);
-      const ridesData = [];
-
-      querySnapshot.forEach((doc) => {
+      // Get ongoing rides
+      const ongoingQuery = query(
+        collection(db, 'rides'),
+        where('status', '==', 'ongoing')
+      );
+      const ongoingSnapshot = await getDocs(ongoingQuery);
+      ongoingSnapshot.forEach((doc) => {
         ridesData.push({
           id: doc.id,
           ...doc.data(),
@@ -148,6 +165,8 @@ export default function JoinRide() {
       sx={{
         minHeight: '100vh',
         bgcolor: '#f5f5f5',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {/* Purple Header */}
@@ -223,7 +242,7 @@ export default function JoinRide() {
       </Menu>
 
       {/* Content */}
-      <Container maxWidth="sm" sx={{ py: 3, px: 2 }}>
+      <Container maxWidth="sm" sx={{ py: 3, px: 2, flex: 1, pb: 10 }}>
         {/* Active Filter Display */}
         {selectedFilter !== 'All Rides' && (
           <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -304,7 +323,7 @@ export default function JoinRide() {
           </Box>
         )}
 
-        {/* Rides List - Improved Design */}
+        {/* Rides List */}
         {!loading && !error && filteredRides.length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             {filteredRides.map((ride) => (
@@ -419,20 +438,37 @@ export default function JoinRide() {
                     </Box>
                   </Box>
 
-                  {/* Bottom Section: Ride Type + View Details Button */}
+                  {/* Bottom Section: Ride Type + Status + View Details Button */}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                    {/* Ride Type Chip */}
-                    <Chip
-                      label={ride.rideType}
-                      sx={{
-                        bgcolor: getRideTypeColor(ride.rideType),
-                        color: 'white',
-                        fontWeight: 600,
-                        fontSize: '0.8rem',
-                        height: 32,
-                        borderRadius: 2,
-                      }}
-                    />
+                    {/* Left: Ride Type + Status Badge */}
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip
+                        label={ride.rideType}
+                        sx={{
+                          bgcolor: getRideTypeColor(ride.rideType),
+                          color: 'white',
+                          fontWeight: 600,
+                          fontSize: '0.8rem',
+                          height: 32,
+                          borderRadius: 2,
+                        }}
+                      />
+
+                      {/* ONGOING BADGE */}
+                      {ride.status === 'ongoing' && (
+                        <Chip
+                          label="Ongoing"
+                          sx={{
+                            bgcolor: '#f59e0b',
+                            color: 'white',
+                            fontWeight: 600,
+                            fontSize: '0.8rem',
+                            height: 32,
+                            borderRadius: 2,
+                          }}
+                        />
+                      )}
+                    </Box>
 
                     {/* View Details Button */}
                     <Button
@@ -463,6 +499,59 @@ export default function JoinRide() {
           </Box>
         )}
       </Container>
+
+      {/* Bottom Navigation */}
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          bgcolor: 'white',
+          borderTop: '1px solid #e5e7eb',
+          py: 1.5,
+          zIndex: 1000,
+        }}
+      >
+        <Container maxWidth="sm">
+          <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
+              <IconButton sx={{ color: '#94a3b8' }}>
+                <Home />
+              </IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
+                Home
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+              <IconButton sx={{ color: '#7c3aed' }}>
+                <DirectionsBike />
+              </IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#7c3aed', fontWeight: 600 }}>
+                Rides
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => alert('Chat - Coming Soon!')}>
+              <IconButton sx={{ color: '#94a3b8' }}>
+                <Badge badgeContent={2} color="error">
+                  <Chat />
+                </Badge>
+              </IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
+                Chat
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/profile')}>
+              <IconButton sx={{ color: '#94a3b8' }}>
+                <Person />
+              </IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
+                Profile
+              </Typography>
+            </Box>
+          </Box>
+        </Container>
+      </Box>
     </Box>
   );
 }
