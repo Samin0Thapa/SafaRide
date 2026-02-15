@@ -325,7 +325,7 @@ export default function Profile() {
             cursor: 'pointer',
             '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' },
           }}
-          onClick={() => alert('Emergency Contacts - Coming Soon!')}
+          onClick={() => navigate('/emergency-contacts')}
         >
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
             <Box

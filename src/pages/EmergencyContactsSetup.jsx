@@ -27,6 +27,7 @@ import {
   Phone,
   People,
   MedicalServices,
+  CheckCircle,
 } from '@mui/icons-material';
 
 export default function EmergencyContactsSetup() {
@@ -43,6 +44,7 @@ export default function EmergencyContactsSetup() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
   
   const [formData, setFormData] = useState({
@@ -96,8 +98,7 @@ export default function EmergencyContactsSetup() {
         medicalInfo: medicalInfo,
       });
 
-      alert('Emergency contacts saved successfully!');
-      navigate('/dashboard');
+      setShowSuccessDialog(true);
     } catch (error) {
       console.error('Error saving emergency contacts:', error);
       alert('Failed to save. Please try again.');
@@ -147,6 +148,11 @@ export default function EmergencyContactsSetup() {
     setShowAddDialog(true);
   };
 
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false);
+    navigate('/dashboard');
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -162,7 +168,7 @@ export default function EmergencyContactsSetup() {
       sx={{
         minHeight: '100vh',
         bgcolor: '#f5f5f5',
-        pb: 3,
+        pb: 10,
       }}
     >
       {/* Purple Header */}
@@ -188,31 +194,11 @@ export default function EmergencyContactsSetup() {
               Emergency Contacts
             </Typography>
           </Box>
-          
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving}
-            sx={{
-              bgcolor: 'white',
-              color: '#7c3aed',
-              px: 3,
-              py: 1,
-              fontWeight: 600,
-              textTransform: 'none',
-              borderRadius: 3,
-              '&:hover': {
-                bgcolor: '#f3f4f6',
-              },
-            }}
-          >
-            {saving ? <CircularProgress size={20} /> : 'Save'}
-          </Button>
         </Box>
       </Box>
 
       {/* Content */}
-      <Container maxWidth="sm" sx={{ mt: -2, px: 2 }}>
+      <Container maxWidth="sm" sx={{ mt: 3, px: 2 }}>
         {/* Warning Alert */}
         {!isValid && (
           <Alert
@@ -365,7 +351,7 @@ export default function EmergencyContactsSetup() {
         </Box>
 
         {/* Medical Information Section */}
-        <Box>
+        <Box sx={{ mb: 10 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <MedicalServices sx={{ color: '#ef4444', fontSize: 24 }} />
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
@@ -451,6 +437,47 @@ export default function EmergencyContactsSetup() {
           </Box>
         </Box>
       </Container>
+
+      {/* Fixed Bottom Save Button */}
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          bgcolor: 'white',
+          borderTop: '1px solid #e2e8f0',
+          p: 2,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
+        }}
+      >
+        <Container maxWidth="sm">
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={handleSave}
+            disabled={saving}
+            sx={{
+              bgcolor: '#7c3aed',
+              color: 'white',
+              py: 2,
+              fontSize: '1rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 4,
+              boxShadow: '0 4px 12px rgba(124,58,237,0.3)',
+              '&:hover': {
+                bgcolor: '#6d28d9',
+              },
+              '&:disabled': {
+                bgcolor: '#cbd5e1',
+              },
+            }}
+          >
+            {saving ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Save Emergency Contacts'}
+          </Button>
+        </Container>
+      </Box>
 
       {/* Add/Edit Contact Dialog */}
       <Dialog
@@ -557,6 +584,63 @@ export default function EmergencyContactsSetup() {
             }}
           >
             {editingContact !== null ? 'Save Changes' : 'Add Contact'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog
+        open={showSuccessDialog}
+        onClose={handleSuccessDialogClose}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            p: 2,
+            textAlign: 'center',
+          },
+        }}
+      >
+        <DialogContent>
+          <Box
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              bgcolor: '#dcfce7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}
+          >
+            <CheckCircle sx={{ fontSize: 50, color: '#22c55e' }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 1 }}>
+            Emergency Contacts Saved!
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Your emergency contacts have been successfully saved and updated.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+          <Button
+            variant="contained"
+            onClick={handleSuccessDialogClose}
+            sx={{
+              bgcolor: '#7c3aed',
+              px: 4,
+              py: 1.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 3,
+              '&:hover': {
+                bgcolor: '#6d28d9',
+              },
+            }}
+          >
+            Done
           </Button>
         </DialogActions>
       </Dialog>
