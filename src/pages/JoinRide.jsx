@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import {
   Box,
@@ -32,13 +32,39 @@ import {
 
 export default function JoinRide() {
   const navigate = useNavigate();
-  const user = auth.currentUser;
+  const [user, setUser] = useState(null);
   const [rides, setRides] = useState([]);
   const [filteredRides, setFilteredRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterAnchor, setFilterAnchor] = useState(null);
   const [selectedFilter, setSelectedFilter] = useState('All Rides');
+  const [userRole, setUserRole] = useState(null);
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setUserRole(userDoc.data().role);
+          }
+        } catch (error) {
+          console.error('Error fetching user role:', error);
+        }
+      }
+    };
+    fetchUserRole();
+  }, [user]);
 
   const rideTypes = [
     'All Rides',
@@ -308,18 +334,20 @@ export default function JoinRide() {
                 ? 'Be the first to create a ride!' 
                 : 'Try a different filter or create a ride!'}
             </Typography>
-            <Button
-              variant="contained"
-              onClick={() => navigate('/create-ride')}
-              sx={{
-                bgcolor: '#7c3aed',
-                '&:hover': { bgcolor: '#6d28d9' },
-                textTransform: 'none',
-                mt: 2,
-              }}
-            >
-              Create a Ride
-            </Button>
+            {(userRole === 'organizer' || userRole === 'admin') && (
+              <Button
+                variant="contained"
+                onClick={() => navigate('/create-ride')}
+                sx={{
+                  bgcolor: '#7c3aed',
+                  '&:hover': { bgcolor: '#6d28d9' },
+                  textTransform: 'none',
+                  mt: 2,
+                }}
+              >
+                Create a Ride
+              </Button>
+            )}
           </Box>
         )}
 
