@@ -141,7 +141,7 @@ export default function Dashboard() {
 
   const handleSOSClick = (rideId) => {
     // Navigate to SOS page or trigger SOS
-    alert('SOS functionality - Coming soon!');
+    navigate('/emergency-sos');
   };
 
   const formatTime = (timeString) => {

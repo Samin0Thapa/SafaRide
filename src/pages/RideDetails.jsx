@@ -226,7 +226,7 @@ export default function RideDetails() {
   };
 
   const handleSOSClick = () => {
-    alert('SOS Alert Sent! Emergency services have been notified.');
+    navigate('/emergency-sos');
   };
 
   const formatTime = (timeString) => {

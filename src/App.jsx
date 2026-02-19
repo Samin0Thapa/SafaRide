@@ -15,6 +15,7 @@ import OrganizerVerificationForm from "./pages/OrganizerVerificationForm";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import AdminDashboard from "./pages/AdminDashboard";
 import EmergencyContactsSetup from './pages/EmergencyContactsSetup';
+import EmergencySOS from "./pages/EmergencySOS";
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
           <Route path="/become-organizer" element={<TrustVerification />} />
           <Route path="/verification-form" element={<OrganizerVerificationForm />} />
           <Route path="/emergency-contacts" element={<EmergencyContactsSetup />} />
+          <Route path="/emergency-sos" element={<EmergencySOS />} />
 
           
           {/* ADMIN ROUTE */}
