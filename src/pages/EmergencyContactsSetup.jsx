@@ -28,6 +28,7 @@ import {
   People,
   MedicalServices,
   CheckCircle,
+  Warning,
 } from '@mui/icons-material';
 
 export default function EmergencyContactsSetup() {
@@ -114,16 +115,13 @@ export default function EmergencyContactsSetup() {
     }
 
     if (editingContact !== null) {
-      // Edit existing contact
       const updatedContacts = [...contacts];
       updatedContacts[editingContact] = formData;
       setContacts(updatedContacts);
     } else {
-      // Add new contact
       setContacts([...contacts, formData]);
     }
 
-    // Reset form
     setFormData({ name: '', phone: '', relationship: '' });
     setShowAddDialog(false);
     setEditingContact(null);
@@ -267,7 +265,6 @@ export default function EmergencyContactsSetup() {
                     gap: 2,
                   }}
                 >
-                  {/* Avatar */}
                   <Avatar
                     sx={{
                       width: 56,
@@ -279,7 +276,6 @@ export default function EmergencyContactsSetup() {
                     <Person sx={{ fontSize: 30 }} />
                   </Avatar>
 
-                  {/* Contact Info */}
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
                       {contact.name}
@@ -298,7 +294,6 @@ export default function EmergencyContactsSetup() {
                     </Box>
                   </Box>
 
-                  {/* Action Buttons */}
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <IconButton
                       onClick={() => handleEditContact(index)}
@@ -351,7 +346,7 @@ export default function EmergencyContactsSetup() {
         </Box>
 
         {/* Medical Information Section */}
-        <Box sx={{ mb: 10 }}>
+        <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <MedicalServices sx={{ color: '#ef4444', fontSize: 24 }} />
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
@@ -367,7 +362,6 @@ export default function EmergencyContactsSetup() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
             }}
           >
-            {/* Blood Type */}
             <Box sx={{ mb: 2.5 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
                 Blood Type
@@ -393,7 +387,6 @@ export default function EmergencyContactsSetup() {
               </TextField>
             </Box>
 
-            {/* Allergies */}
             <Box sx={{ mb: 2.5 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
                 Allergies
@@ -414,7 +407,6 @@ export default function EmergencyContactsSetup() {
               />
             </Box>
 
-            {/* Medical Conditions */}
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
                 Medical Conditions
@@ -436,6 +428,32 @@ export default function EmergencyContactsSetup() {
             </Box>
           </Box>
         </Box>
+
+        {/* Test SOS Button */}
+        <Button
+          fullWidth
+          variant="outlined"
+          startIcon={<Warning />}
+          onClick={() => navigate('/emergency-sos')}
+          sx={{
+            borderColor: '#ef4444',
+            color: '#ef4444',
+            py: 2,
+            fontSize: '1rem',
+            fontWeight: 600,
+            textTransform: 'none',
+            borderRadius: 4,
+            borderWidth: 2,
+            mb: 10,
+            '&:hover': {
+              borderColor: '#dc2626',
+              bgcolor: '#fef2f2',
+              borderWidth: 2,
+            },
+          }}
+        >
+          Test Emergency SOS
+        </Button>
       </Container>
 
       {/* Fixed Bottom Save Button */}
@@ -449,6 +467,7 @@ export default function EmergencyContactsSetup() {
           borderTop: '1px solid #e2e8f0',
           p: 2,
           boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
+          zIndex: 1000,
         }}
       >
         <Container maxWidth="sm">
@@ -498,7 +517,6 @@ export default function EmergencyContactsSetup() {
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
-          {/* Name */}
           <Box sx={{ mb: 2.5 }}>
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
               Name *
@@ -516,7 +534,6 @@ export default function EmergencyContactsSetup() {
             />
           </Box>
 
-          {/* Phone */}
           <Box sx={{ mb: 2.5 }}>
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
               Phone Number *
@@ -534,7 +551,6 @@ export default function EmergencyContactsSetup() {
             />
           </Box>
 
-          {/* Relationship */}
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
               Relationship *
