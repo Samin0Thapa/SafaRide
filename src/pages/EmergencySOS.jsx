@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../services/firebase';
+import { auth, db } from '../services/firebase';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import {
   Box,
   Container,
@@ -9,6 +10,14 @@ import {
   Card,
   CardContent,
   Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Divider,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -17,6 +26,9 @@ import {
   Person,
   DirectionsBike,
   Notifications,
+  Phone,
+  Close,
+  Block,
 } from '@mui/icons-material';
 
 export default function EmergencySOS() {
@@ -25,6 +37,16 @@ export default function EmergencySOS() {
   const [isHolding, setIsHolding] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
   const [sosActive, setSOSActive] = useState(false);
+  const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
+  const [showContactsDialog, setShowContactsDialog] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
+  
+  // Ride data
+  const [activeRide, setActiveRide] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [isParticipant, setIsParticipant] = useState(false);
+  const [loading, setLoading] = useState(true);
+
   const holdTimerRef = useRef(null);
   const progressIntervalRef = useRef(null);
   const beepIntervalRef = useRef(null);
@@ -32,15 +54,85 @@ export default function EmergencySOS() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        checkActiveRide(currentUser.uid);
+      }
     });
     return () => unsubscribe();
   }, []);
 
+  const checkActiveRide = async (userId) => {
+    try {
+      setLoading(true);
+      
+      // Query for active rides where user is a participant
+      const ridesQuery = query(
+        collection(db, 'rides'),
+        where('participants', 'array-contains', userId)
+      );
+      
+      const snapshot = await getDocs(ridesQuery);
+      
+      // Find an active/ongoing ride
+      let foundActiveRide = null;
+      
+      snapshot.forEach((doc) => {
+        const rideData = doc.data();
+        const rideDate = new Date(rideData.date);
+        const now = new Date();
+        
+        // Check if ride is today or ongoing (you can adjust this logic)
+        // For now, let's consider rides from today as "active"
+        if (rideDate.toDateString() === now.toDateString()) {
+          foundActiveRide = { id: doc.id, ...rideData };
+        }
+      });
+      
+      if (foundActiveRide) {
+        setActiveRide(foundActiveRide);
+        setIsParticipant(true);
+        await fetchParticipants(foundActiveRide.participants || []);
+      } else {
+        setIsParticipant(false);
+      }
+      
+    } catch (error) {
+      console.error('Error checking active ride:', error);
+      setIsParticipant(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchParticipants = async (participantIds) => {
+    try {
+      const participantsData = [];
+      
+      for (const participantId of participantIds) {
+        const userDoc = await getDoc(doc(db, 'users', participantId));
+        if (userDoc.exists()) {
+          participantsData.push({
+            id: participantId,
+            ...userDoc.data(),
+          });
+        }
+      }
+      
+      setParticipants(participantsData);
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+    }
+  };
+
   const handleHoldStart = () => {
+    // Only allow if user is a participant
+    if (!isParticipant) {
+      return;
+    }
+
     setIsHolding(true);
     setHoldProgress(0);
 
-    // Progress animation
     progressIntervalRef.current = setInterval(() => {
       setHoldProgress((prev) => {
         if (prev >= 100) {
@@ -51,7 +143,6 @@ export default function EmergencySOS() {
       });
     }, 100);
 
-    // Activation after 2 seconds
     holdTimerRef.current = setTimeout(() => {
       handleSOSActivate();
     }, 2000);
@@ -70,13 +161,13 @@ export default function EmergencySOS() {
   };
 
   const handleSOSActivate = () => {
-    // Activate SOS mode
     setSOSActive(true);
-    
-    // Start continuous beeping
     startContinuousBeep();
     
-    // TODO: Trigger SOS alert to all participants via Firestore
+    if (participants.length > 0) {
+      setShowParticipantsDialog(true);
+    }
+    
     console.log('🚨 SOS ACTIVATED! Notifying all participants...');
     
     setIsHolding(false);
@@ -91,32 +182,28 @@ export default function EmergencySOS() {
   };
 
   const handleStopSOS = () => {
-    // Stop SOS mode
     setSOSActive(false);
-    
-    // Stop beeping
+    setShowParticipantsDialog(false);
     stopContinuousBeep();
-    
     console.log('✅ SOS STOPPED');
     
-    // Navigate back
     setTimeout(() => {
       navigate(-1);
     }, 500);
   };
 
-  // Start continuous beeping (every 1 second)
+  const handleShowContacts = (participant) => {
+    setSelectedParticipant(participant);
+    setShowContactsDialog(true);
+  };
+
   const startContinuousBeep = () => {
-    // Play first beep immediately
     playBeep();
-    
-    // Then play beep every 1 second
     beepIntervalRef.current = setInterval(() => {
       playBeep();
     }, 1000);
   };
 
-  // Stop continuous beeping
   const stopContinuousBeep = () => {
     if (beepIntervalRef.current) {
       clearInterval(beepIntervalRef.current);
@@ -124,20 +211,23 @@ export default function EmergencySOS() {
     }
   };
 
-  // Play single beep
   const playBeep = () => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 900; // High-pitched emergency beep
-    gainNode.gain.value = 0.4; // Volume
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3); // 0.3 second beep
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 900;
+      gainNode.gain.value = 0.4;
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+      console.error('Audio error:', error);
+    }
   };
 
   useEffect(() => {
@@ -147,6 +237,14 @@ export default function EmergencySOS() {
       if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
     };
   }, []);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress sx={{ color: '#7c3aed' }} />
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -181,6 +279,31 @@ export default function EmergencySOS() {
       </Box>
 
       <Container maxWidth="sm" sx={{ py: 3, px: 2 }}>
+        {/* Access Denied Alert - Show if NOT a participant */}
+        {!isParticipant && (
+          <Alert
+            severity="error"
+            icon={<Block />}
+            sx={{
+              mb: 3,
+              borderRadius: 3,
+              bgcolor: '#fef2f2',
+              color: '#991b1b',
+              border: '2px solid #fecaca',
+              '& .MuiAlert-icon': {
+                color: '#dc2626',
+              },
+            }}
+          >
+            <Typography variant="body1" sx={{ fontWeight: 700, mb: 0.5 }}>
+              Access Restricted
+            </Typography>
+            <Typography variant="body2">
+              You must be a participant in an active ride to use the Emergency SOS feature. Join a ride to enable this feature.
+            </Typography>
+          </Alert>
+        )}
+
         {/* Warning Card */}
         <Card
           sx={{
@@ -188,6 +311,7 @@ export default function EmergencySOS() {
             mb: 3,
             borderLeft: '6px solid #D32F2F',
             boxShadow: '0 4px 20px rgba(211, 47, 47, 0.1)',
+            opacity: !isParticipant ? 0.6 : 1,
           }}
         >
           <CardContent sx={{ p: 2.5 }}>
@@ -211,99 +335,101 @@ export default function EmergencySOS() {
                   Emergency Alert
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.6 }}>
-                  Activating SOS will immediately notify all ride participants and your emergency contacts. Use only in genuine emergencies.
+                  Activating SOS will immediately notify all ride participants and their emergency contacts. Use only in genuine emergencies.
                 </Typography>
               </Box>
             </Box>
           </CardContent>
         </Card>
 
-        {/* Status Dashboard - Dual Column */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-          {/* GPS Status */}
-          <Card
-            sx={{
-              flex: 1,
-              borderRadius: 6,
-              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-            }}
-          >
-            <CardContent sx={{ textAlign: 'center', py: 2.5 }}>
-              <Box
-                sx={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: '50%',
-                  bgcolor: '#E8F5E9',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto',
-                  mb: 1.5,
-                  position: 'relative',
-                }}
-              >
-                <MyLocation sx={{ fontSize: 28, color: '#4CAF50' }} />
+        {/* Status Dashboard - Only show if participant */}
+        {isParticipant && activeRide && (
+          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            {/* GPS Status */}
+            <Card
+              sx={{
+                flex: 1,
+                borderRadius: 6,
+                boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 2.5 }}>
                 <Box
                   sx={{
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    width: 14,
-                    height: 14,
+                    width: 56,
+                    height: 56,
                     borderRadius: '50%',
-                    bgcolor: '#4CAF50',
-                    border: '2px solid white',
-                    animation: 'pulse 2s infinite',
-                    '@keyframes pulse': {
-                      '0%, 100%': { opacity: 1 },
-                      '50%': { opacity: 0.5 },
-                    },
+                    bgcolor: '#E8F5E9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto',
+                    mb: 1.5,
+                    position: 'relative',
                   }}
-                />
-              </Box>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                GPS Status
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#4CAF50', fontWeight: 600 }}>
-                Live
-              </Typography>
-            </CardContent>
-          </Card>
+                >
+                  <MyLocation sx={{ fontSize: 28, color: '#4CAF50' }} />
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      width: 14,
+                      height: 14,
+                      borderRadius: '50%',
+                      bgcolor: '#4CAF50',
+                      border: '2px solid white',
+                      animation: 'pulse 2s infinite',
+                      '@keyframes pulse': {
+                        '0%, 100%': { opacity: 1 },
+                        '50%': { opacity: 0.5 },
+                      },
+                    }}
+                  />
+                </Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+                  GPS Status
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#4CAF50', fontWeight: 600 }}>
+                  Live
+                </Typography>
+              </CardContent>
+            </Card>
 
-          {/* Emergency Contacts */}
-          <Card
-            sx={{
-              flex: 1,
-              borderRadius: 6,
-              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-            }}
-          >
-            <CardContent sx={{ textAlign: 'center', py: 2.5 }}>
-              <Box
-                sx={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: '50%',
-                  bgcolor: '#F3E5F5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto',
-                  mb: 1.5,
-                }}
-              >
-                <Person sx={{ fontSize: 28, color: '#7c3aed' }} />
-              </Box>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                Contacts
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#7c3aed', fontWeight: 600 }}>
-                3 Linked
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
+            {/* Ride Participants */}
+            <Card
+              sx={{
+                flex: 1,
+                borderRadius: 6,
+                boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 2.5 }}>
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    bgcolor: '#F3E5F5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto',
+                    mb: 1.5,
+                  }}
+                >
+                  <DirectionsBike sx={{ fontSize: 28, color: '#7c3aed' }} />
+                </Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+                  Participants
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#7c3aed', fontWeight: 600 }}>
+                  {participants.length} Riders
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
 
         {/* Hero Action - SOS Button */}
         <Card
@@ -314,6 +440,7 @@ export default function EmergencySOS() {
               ? '0 8px 32px rgba(211, 47, 47, 0.4)' 
               : '0 8px 32px rgba(211, 47, 47, 0.15)',
             bgcolor: sosActive ? '#FFEBEE' : 'white',
+            opacity: !isParticipant && !sosActive ? 0.5 : 1,
           }}
         >
           <CardContent sx={{ py: 5, px: 3, textAlign: 'center' }}>
@@ -336,9 +463,10 @@ export default function EmergencySOS() {
                     borderRadius: '50%',
                     margin: '0 auto',
                     position: 'relative',
-                    cursor: 'pointer',
+                    cursor: isParticipant ? 'pointer' : 'not-allowed',
                     userSelect: 'none',
                     mb: 3,
+                    filter: !isParticipant ? 'grayscale(100%)' : 'none',
                   }}
                 >
                   {/* Progress Ring */}
@@ -365,7 +493,7 @@ export default function EmergencySOS() {
                       cy="100"
                       r="95"
                       fill="none"
-                      stroke="#D32F2F"
+                      stroke={isParticipant ? '#D32F2F' : '#cbd5e1'}
                       strokeWidth="10"
                       strokeDasharray={`${2 * Math.PI * 95}`}
                       strokeDashoffset={`${2 * Math.PI * 95 * (1 - holdProgress / 100)}`}
@@ -383,7 +511,7 @@ export default function EmergencySOS() {
                       width: 170,
                       height: 170,
                       borderRadius: '50%',
-                      bgcolor: isHolding ? '#B71C1C' : '#D32F2F',
+                      bgcolor: !isParticipant ? '#94a3b8' : (isHolding ? '#B71C1C' : '#D32F2F'),
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -410,19 +538,25 @@ export default function EmergencySOS() {
                         mb: 1,
                       }}
                     >
-                      <Notifications sx={{ fontSize: 36 }} />
+                      {!isParticipant ? (
+                        <Block sx={{ fontSize: 36 }} />
+                      ) : (
+                        <Notifications sx={{ fontSize: 36 }} />
+                      )}
                     </Box>
                     <Typography variant="body1" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-                      {isHolding ? 'Activating...' : 'Hold to'}
+                      {!isParticipant ? 'Locked' : (isHolding ? 'Activating...' : 'Hold to')}
                     </Typography>
                     <Typography variant="body1" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-                      {isHolding ? `${Math.floor((holdProgress / 100) * 2)}s` : 'Activate'}
+                      {!isParticipant ? '' : (isHolding ? `${Math.floor((holdProgress / 100) * 2)}s` : 'Activate')}
                     </Typography>
                   </Box>
                 </Box>
 
                 <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-                  {isHolding ? 'Release to cancel activation' : 'Press and hold for 2 seconds'}
+                  {!isParticipant 
+                    ? 'Join an active ride to enable SOS' 
+                    : (isHolding ? 'Release to cancel activation' : 'Press and hold for 2 seconds')}
                 </Typography>
               </>
             ) : (
@@ -461,6 +595,30 @@ export default function EmergencySOS() {
                 <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
                   Emergency alert is broadcasting...
                 </Typography>
+
+                {/* View Participants Button */}
+                {participants.length > 0 && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => setShowParticipantsDialog(true)}
+                    sx={{
+                      borderColor: '#7c3aed',
+                      color: '#7c3aed',
+                      mb: 3,
+                      px: 4,
+                      py: 1.5,
+                      borderRadius: 3,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      '&:hover': {
+                        borderColor: '#6d28d9',
+                        bgcolor: 'rgba(124,58,237,0.05)',
+                      },
+                    }}
+                  >
+                    View All Participants
+                  </Button>
+                )}
 
                 {/* Stop SOS Button */}
                 <Box
@@ -501,62 +659,226 @@ export default function EmergencySOS() {
           </CardContent>
         </Card>
 
-        {/* Who Will Be Notified */}
-        <Card
-          sx={{
-            borderRadius: 6,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-          }}
-        >
-          <CardContent sx={{ p: 2.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 2 }}>
-              Who will be notified
-            </Typography>
+        {/* Current Ride Info - Only show if participant */}
+        {isParticipant && activeRide && (
+          <Card
+            sx={{
+              borderRadius: 6,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+            }}
+          >
+            <CardContent sx={{ p: 2.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 2 }}>
+                Current Ride
+              </Typography>
 
-            {/* Ride Participants */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-              <Avatar
-                sx={{
-                  width: 48,
-                  height: 48,
-                  bgcolor: '#7c3aed',
-                }}
-              >
-                <DirectionsBike sx={{ fontSize: 24 }} />
-              </Avatar>
-              <Box>
-                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                  All Ride Participants
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                  Currently 5 riders in your group
-                </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    bgcolor: '#7c3aed',
+                  }}
+                >
+                  <DirectionsBike sx={{ fontSize: 24 }} />
+                </Avatar>
+                <Box>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                    {activeRide.title || 'Unnamed Ride'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+                    {participants.length} participants in this ride
+                  </Typography>
+                </Box>
               </Box>
-            </Box>
-
-            {/* Emergency Contacts */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar
-                sx={{
-                  width: 48,
-                  height: 48,
-                  bgcolor: '#ec4899',
-                }}
-              >
-                <Person sx={{ fontSize: 24 }} />
-              </Avatar>
-              <Box>
-                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                  Your Emergency Contacts
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                  3 contacts will receive SMS alerts
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </Container>
+
+      {/* Participants Dialog */}
+      <Dialog
+        open={showParticipantsDialog}
+        onClose={() => setShowParticipantsDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            maxHeight: '80vh',
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 2, pt: 3, px: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Ride Participants ({participants.length})
+            </Typography>
+            <IconButton
+              onClick={() => setShowParticipantsDialog(false)}
+              sx={{ color: '#64748b' }}
+            >
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, pb: 3 }}>
+          {participants.map((participant, index) => (
+            <Box key={participant.id}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  py: 2,
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    bgcolor: '#f3e8ff',
+                    color: '#7c3aed',
+                    fontWeight: 700,
+                  }}
+                >
+                  {participant.displayName?.charAt(0)?.toUpperCase() || 'U'}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                    {participant.displayName || 'Unknown User'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+                    {participant.email}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => handleShowContacts(participant)}
+                  sx={{
+                    bgcolor: '#7c3aed',
+                    color: 'white',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    px: 2,
+                    borderRadius: 2,
+                    '&:hover': {
+                      bgcolor: '#6d28d9',
+                    },
+                  }}
+                >
+                  Contacts
+                </Button>
+              </Box>
+              {index < participants.length - 1 && <Divider />}
+            </Box>
+          ))}
+        </DialogContent>
+      </Dialog>
+
+      {/* Emergency Contacts Dialog */}
+      <Dialog
+        open={showContactsDialog}
+        onClose={() => setShowContactsDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 2, pt: 3, px: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Emergency Contacts
+            </Typography>
+            <IconButton
+              onClick={() => setShowContactsDialog(false)}
+              sx={{ color: '#64748b' }}
+            >
+              <Close />
+            </IconButton>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+            {selectedParticipant?.displayName || 'User'}
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, pb: 3 }}>
+          {selectedParticipant?.emergencyContacts?.length > 0 ? (
+            selectedParticipant.emergencyContacts.map((contact, index) => (
+              <Box key={index}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    py: 2,
+                  }}
+                >
+                  <Avatar
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      bgcolor: '#fee2e2',
+                      color: '#ef4444',
+                    }}
+                  >
+                    <Person sx={{ fontSize: 24 }} />
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                      {contact.name}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem', mb: 0.5 }}>
+                      {contact.relationship}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Phone sx={{ fontSize: 14, color: '#7c3aed' }} />
+                      <Typography variant="body2" sx={{ color: '#7c3aed', fontSize: '0.85rem', fontWeight: 600 }}>
+                        {contact.phone}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <IconButton
+                    href={`tel:${contact.phone}`}
+                    sx={{
+                      bgcolor: '#dcfce7',
+                      color: '#22c55e',
+                      '&:hover': {
+                        bgcolor: '#bbf7d0',
+                      },
+                    }}
+                  >
+                    <Phone />
+                  </IconButton>
+                </Box>
+                {index < selectedParticipant.emergencyContacts.length - 1 && <Divider />}
+              </Box>
+            ))
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Person sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
+              <Typography variant="body2" sx={{ color: '#64748b' }}>
+                No emergency contacts available
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={() => setShowContactsDialog(false)}
+            sx={{
+              color: '#64748b',
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

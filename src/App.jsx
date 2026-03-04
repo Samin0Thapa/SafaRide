@@ -34,7 +34,7 @@ function App() {
           <Route path="/become-organizer" element={<TrustVerification />} />
           <Route path="/verification-form" element={<OrganizerVerificationForm />} />
           <Route path="/emergency-contacts" element={<EmergencyContactsSetup />} />
-          <Route path="/emergency-sos" element={<EmergencySOS />} />
+          <Route path="/emergency-sos/:rideId" element={<EmergencySOS />} />
 
           
           {/* ADMIN ROUTE */}

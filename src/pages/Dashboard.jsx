@@ -57,63 +57,39 @@ export default function Dashboard() {
 
   // Fetch user role on component mount
   useEffect(() => {
-    const fetchUserRole = async () => {
-      if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            setUserRole(userDoc.data().role);
-          }
-        } catch (error) {
-          console.error('Error fetching user role:', error);
-        }
-      }
-    };
-    fetchUserRole();
-  }, [user]);
+  const fetchOngoingRides = async () => {
+    if (!user) {
+      setLoadingRides(false);
+      return;
+    }
 
-  // Fetch ongoing rides where user is a participant
-  useEffect(() => {
-    const fetchOngoingRides = async () => {
-      if (!user) {
-        setLoadingRides(false);
-        return;
-      }
+    try {
+      setLoadingRides(true);
+      
+      // Query ALL ongoing rides (everyone can see them)
+      const ridesQuery = query(
+        collection(db, 'rides'),
+        where('status', '==', 'ongoing')
+      );
 
-      try {
-        setLoadingRides(true);
-        
-        // Query rides where status is 'ongoing'
-        const ridesQuery = query(
-          collection(db, 'rides'),
-          where('status', '==', 'ongoing')
-        );
+      const querySnapshot = await getDocs(ridesQuery);
+      const ridesData = [];
 
-        const querySnapshot = await getDocs(ridesQuery);
-        const ridesData = [];
+      querySnapshot.forEach((doc) => {
+        const rideData = { id: doc.id, ...doc.data() };
+        ridesData.push(rideData);
+      });
 
-        querySnapshot.forEach((doc) => {
-          const rideData = { id: doc.id, ...doc.data() };
-          
-          // Check if current user is a participant OR the organizer
-          const isParticipant = rideData.participants?.some(p => p.userId === user.uid);
-          const isOrganizer = rideData.createdBy === user.uid;
-          
-          if (isParticipant || isOrganizer) {
-            ridesData.push(rideData);
-          }
-        });
+      setOngoingRides(ridesData);
+    } catch (error) {
+      console.error('Error fetching ongoing rides:', error);
+    } finally {
+      setLoadingRides(false);
+    }
+  };
 
-        setOngoingRides(ridesData);
-      } catch (error) {
-        console.error('Error fetching ongoing rides:', error);
-      } finally {
-        setLoadingRides(false);
-      }
-    };
-
-    fetchOngoingRides();
-  }, [user]);
+  fetchOngoingRides();
+}, [user]);
 
   const handleLogout = async () => {
     try {
@@ -572,52 +548,90 @@ export default function Dashboard() {
                       </Box>
 
                       {/* Action Buttons */}
-                      <Box sx={{ display: 'flex', gap: 1.5 }}>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          onClick={() => navigate(`/ride-details/${ride.id}`)}
-                          sx={{
-                            color: '#7c3aed',
-                            borderColor: '#7c3aed',
-                            py: 1.2,
-                            fontSize: '0.9rem',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            borderRadius: 3,
-                            borderWidth: 2,
-                            '&:hover': {
-                              borderColor: '#6d28d9',
-                              bgcolor: 'transparent',
-                              borderWidth: 2,
-                            },
-                          }}
-                        >
-                          View Details
-                        </Button>
-                        <Button
-                          variant="contained"
-                          startIcon={<Warning />}
-                          onClick={() => handleSOSClick(ride.id)}
-                          sx={{
-                            bgcolor: '#ef4444',
-                            color: 'white',
-                            py: 1.2,
-                            px: 2.5,
-                            fontSize: '0.9rem',
-                            fontWeight: 700,
-                            textTransform: 'none',
-                            borderRadius: 3,
-                            boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
-                            '&:hover': {
-                              bgcolor: '#dc2626',
-                              boxShadow: '0 6px 16px rgba(239,68,68,0.4)',
-                            },
-                          }}
-                        >
-                          SOS
-                        </Button>
-                      </Box>
+                     {/* Action Buttons */}
+<Box sx={{ display: 'flex', gap: 1.5 }}>
+  <Button
+    fullWidth
+    variant="outlined"
+    onClick={() => navigate(`/ride-details/${ride.id}`)}
+    sx={{
+      color: '#7c3aed',
+      borderColor: '#7c3aed',
+      py: 1.2,
+      fontSize: '0.9rem',
+      fontWeight: 600,
+      textTransform: 'none',
+      borderRadius: 3,
+      borderWidth: 2,
+      '&:hover': {
+        borderColor: '#6d28d9',
+        bgcolor: 'transparent',
+        borderWidth: 2,
+      },
+    }}
+  >
+    View Details
+  </Button>
+  
+  {/* Check if user is participant or creator */}
+  {(() => {
+    const isCreator = ride.createdBy === user.uid;
+    const isParticipant = Array.isArray(ride.participants) && 
+                         ride.participants.some(p => 
+                           (typeof p === 'object' && p.userId === user.uid) || 
+                           p === user.uid
+                         );
+    
+    const canUseSOS = isCreator || isParticipant;
+    
+    return canUseSOS ? (
+      <Button
+        variant="contained"
+        startIcon={<Warning />}
+        onClick={() => navigate(`/emergency-sos/${ride.id}`)}
+        sx={{
+          bgcolor: '#ef4444',
+          color: 'white',
+          py: 1.2,
+          px: 2.5,
+          fontSize: '0.9rem',
+          fontWeight: 700,
+          textTransform: 'none',
+          borderRadius: 3,
+          boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
+          '&:hover': {
+            bgcolor: '#dc2626',
+            boxShadow: '0 6px 16px rgba(239,68,68,0.4)',
+          },
+        }}
+      >
+        SOS
+      </Button>
+    ) : (
+      <Button
+        variant="contained"
+        disabled
+        startIcon={<Warning />}
+        sx={{
+          bgcolor: '#cbd5e1',
+          color: '#64748b',
+          py: 1.2,
+          px: 2.5,
+          fontSize: '0.9rem',
+          fontWeight: 700,
+          textTransform: 'none',
+          borderRadius: 3,
+          '&:disabled': {
+            bgcolor: '#cbd5e1',
+            color: '#64748b',
+          },
+        }}
+      >
+        SOS
+      </Button>
+    );
+  })()}
+</Box>
                     </CardContent>
                   </Card>
                 ))}
