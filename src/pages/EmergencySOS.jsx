@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import {
@@ -33,6 +33,7 @@ import {
 
 export default function EmergencySOS() {
   const navigate = useNavigate();
+  const { rideId } = useParams();
   const [user, setUser] = useState(null);
   const [isHolding, setIsHolding] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
@@ -59,41 +60,79 @@ export default function EmergencySOS() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [rideId]);
 
   const checkActiveRide = async (userId) => {
     try {
       setLoading(true);
       
-      // Query for active rides where user is a participant
-      const ridesQuery = query(
-        collection(db, 'rides'),
-        where('participants', 'array-contains', userId)
-      );
-      
-      const snapshot = await getDocs(ridesQuery);
-      
-      // Find an active/ongoing ride
-      let foundActiveRide = null;
-      
-      snapshot.forEach((doc) => {
-        const rideData = doc.data();
-        const rideDate = new Date(rideData.date);
-        const now = new Date();
+      // If we have a rideId from URL params, use that specific ride
+      if (rideId) {
+        const rideDoc = await getDoc(doc(db, 'rides', rideId));
         
-        // Check if ride is today or ongoing (you can adjust this logic)
-        // For now, let's consider rides from today as "active"
-        if (rideDate.toDateString() === now.toDateString()) {
-          foundActiveRide = { id: doc.id, ...rideData };
+        if (!rideDoc.exists()) {
+          console.log('Ride not found');
+          setLoading(false);
+          return;
         }
-      });
-      
-      if (foundActiveRide) {
-        setActiveRide(foundActiveRide);
-        setIsParticipant(true);
-        await fetchParticipants(foundActiveRide.participants || []);
+
+        const rideData = { id: rideDoc.id, ...rideDoc.data() };
+        
+        // Check if user is participant or creator
+        const isCreator = rideData.createdBy === userId;
+        const isParticipant = Array.isArray(rideData.participants) && 
+                             rideData.participants.some(p => 
+                               (typeof p === 'object' && p.userId === userId) || 
+                               p === userId
+                             );
+        
+        console.log('Checking ride access:');
+        console.log('User ID:', userId);
+        console.log('Is Creator:', isCreator);
+        console.log('Is Participant:', isParticipant);
+        console.log('Participants:', rideData.participants);
+        
+        if (isCreator || isParticipant) {
+          setActiveRide(rideData);
+          setIsParticipant(true);
+          await fetchParticipants(rideData.participants || []);
+        } else {
+          setIsParticipant(false);
+        }
       } else {
-        setIsParticipant(false);
+        // No rideId provided - check for any ongoing rides
+        const ridesQuery = query(
+          collection(db, 'rides'),
+          where('status', '==', 'ongoing')
+        );
+        
+        const snapshot = await getDocs(ridesQuery);
+        
+        let foundActiveRide = null;
+        
+        snapshot.forEach((doc) => {
+          const rideData = { id: doc.id, ...doc.data() };
+          
+          // Check if user is participant or creator
+          const isCreator = rideData.createdBy === userId;
+          const isParticipant = Array.isArray(rideData.participants) && 
+                               rideData.participants.some(p => 
+                                 (typeof p === 'object' && p.userId === userId) || 
+                                 p === userId
+                               );
+          
+          if (isCreator || isParticipant) {
+            foundActiveRide = rideData;
+          }
+        });
+        
+        if (foundActiveRide) {
+          setActiveRide(foundActiveRide);
+          setIsParticipant(true);
+          await fetchParticipants(foundActiveRide.participants || []);
+        } else {
+          setIsParticipant(false);
+        }
       }
       
     } catch (error) {
@@ -104,17 +143,22 @@ export default function EmergencySOS() {
     }
   };
 
-  const fetchParticipants = async (participantIds) => {
+  const fetchParticipants = async (participantsList) => {
     try {
       const participantsData = [];
       
-      for (const participantId of participantIds) {
-        const userDoc = await getDoc(doc(db, 'users', participantId));
-        if (userDoc.exists()) {
-          participantsData.push({
-            id: participantId,
-            ...userDoc.data(),
-          });
+      for (const participant of participantsList) {
+        // Handle both string IDs and objects with userId
+        const participantId = typeof participant === 'object' ? participant.userId : participant;
+        
+        if (participantId) {
+          const userDoc = await getDoc(doc(db, 'users', participantId));
+          if (userDoc.exists()) {
+            participantsData.push({
+              id: participantId,
+              ...userDoc.data(),
+            });
+          }
         }
       }
       
