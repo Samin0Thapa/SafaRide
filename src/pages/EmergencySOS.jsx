@@ -242,45 +242,68 @@ export default function EmergencySOS() {
   };
 
   const startContinuousBeep = () => {
-    playBeep();
-    beepIntervalRef.current = setInterval(() => {
-      playBeep();
-    }, 1000);
-  };
+  playBeepAndVibrate();
+  beepIntervalRef.current = setInterval(() => {
+    playBeepAndVibrate();
+  }, 1000);
+};
 
-  const stopContinuousBeep = () => {
-    if (beepIntervalRef.current) {
-      clearInterval(beepIntervalRef.current);
-      beepIntervalRef.current = null;
-    }
-  };
+const stopContinuousBeep = () => {
+  if (beepIntervalRef.current) {
+    clearInterval(beepIntervalRef.current);
+    beepIntervalRef.current = null;
+  }
+};
 
-  const playBeep = () => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 900;
-      gainNode.gain.value = 0.4;
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.3);
-    } catch (error) {
-      console.error('Audio error:', error);
+const playBeepAndVibrate = () => {
+  // Play beep sound
+  playBeep();
+  
+  // Vibrate phone (if supported)
+  if ('vibrate' in navigator) {
+    // Vibrate for 300ms
+    navigator.vibrate(300);
+  }
+};
+
+const playBeep = () => {
+  try {
+    // Create audio context only once
+    if (!window.audioContext) {
+      window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
-  };
+    
+    const audioContext = window.audioContext;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 900; // High-pitched emergency beep
+    gainNode.gain.value = 0.5; // Increased volume slightly
+    
+    const now = audioContext.currentTime;
+    oscillator.start(now);
+    oscillator.stop(now + 0.3); // 0.3 second beep
+  } catch (error) {
+    console.error('Audio error:', error);
+  }
+};
 
   useEffect(() => {
-    return () => {
-      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
-    };
-  }, []);
+  return () => {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    if (beepIntervalRef.current) {
+      clearInterval(beepIntervalRef.current);
+      // Stop any ongoing vibration
+      if ('vibrate' in navigator) {
+        navigator.vibrate(500);
+      }
+    }
+  };
+}, []);
 
   if (loading) {
     return (
