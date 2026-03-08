@@ -16,6 +16,8 @@ import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import AdminDashboard from "./pages/AdminDashboard";
 import EmergencyContactsSetup from './pages/EmergencyContactsSetup';
 import EmergencySOS from "./pages/EmergencySOS";
+import ChatList from './pages/ChatList';
+import GroupChat from './pages/GroupChat';
 
 function App() {
   return (
@@ -35,6 +37,8 @@ function App() {
           <Route path="/verification-form" element={<OrganizerVerificationForm />} />
           <Route path="/emergency-contacts" element={<EmergencyContactsSetup />} />
           <Route path="/emergency-sos/:rideId" element={<EmergencySOS />} />
+          <Route path="/chat" element={<ChatList />} />
+          <Route path="/chat/:rideId" element={<GroupChat />} />
 
           
           {/* ADMIN ROUTE */}

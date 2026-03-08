@@ -412,7 +412,7 @@ export default function Dashboard() {
               transition: 'transform 0.2s',
               '&:hover': { transform: 'translateY(-2px)' },
             }}
-            onClick={() => alert('Group Chat - Coming Soon!')}
+            onClick={() => alert('/chat')}
           >
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -667,7 +667,7 @@ export default function Dashboard() {
                 Rides
               </Typography>
             </Box>
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/chat')}>
               <IconButton sx={{ color: '#94a3b8' }}>
                 <Badge badgeContent={2} color="error">
                   <Message />
