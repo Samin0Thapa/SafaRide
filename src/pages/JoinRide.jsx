@@ -559,7 +559,7 @@ export default function JoinRide() {
                 Rides
               </Typography>
             </Box>
-            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => alert('Chat - Coming Soon!')}>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/chat')}>
               <IconButton sx={{ color: '#94a3b8' }}>
                 <Badge badgeContent={2} color="error">
                   <Chat />

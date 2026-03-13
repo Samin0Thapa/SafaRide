@@ -497,7 +497,7 @@ export default function Profile() {
                 Rides
               </Typography>
             </Box>
-            <Box sx={{ textAlign: 'center', cursor: 'pointer' }}>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/chat')}>
               <IconButton sx={{ color: '#94a3b8' }}>
                 <Message />
               </IconButton>
