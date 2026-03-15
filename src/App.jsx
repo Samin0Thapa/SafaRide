@@ -18,6 +18,7 @@ import EmergencyContactsSetup from './pages/EmergencyContactsSetup';
 import EmergencySOS from "./pages/EmergencySOS";
 import ChatList from './pages/ChatList';
 import GroupChat from './pages/GroupChat';
+import RateRide from './pages/RateRide';
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
           <Route path="/emergency-sos/:rideId" element={<EmergencySOS />} />
           <Route path="/chat" element={<ChatList />} />
           <Route path="/chat/:rideId" element={<GroupChat />} />
+          <Route path="/rate-ride/:rideId" element={<RateRide />} />
 
           
           {/* ADMIN ROUTE */}

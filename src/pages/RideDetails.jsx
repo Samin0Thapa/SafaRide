@@ -28,7 +28,6 @@ import {
   Star,
   Person,
   Chat,
-  Image as ImageIcon,
   Map as MapIcon,
   ChevronRight,
   Close,
@@ -57,7 +56,6 @@ export default function RideDetails() {
   const [isParticipant, setIsParticipant] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
 
-  // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
@@ -73,7 +71,6 @@ export default function RideDetails() {
     if (ride && user) {
       const participating = ride.participants?.some(p => p.userId === user.uid) || false;
       setIsParticipant(participating);
-      
       const organizing = ride.createdBy === user.uid;
       setIsOrganizer(organizing);
     }
@@ -83,7 +80,6 @@ export default function RideDetails() {
     try {
       setLoading(true);
       const rideDoc = await getDoc(doc(db, 'rides', rideId));
-      
       if (rideDoc.exists()) {
         setRide({ id: rideDoc.id, ...rideDoc.data() });
       } else {
@@ -97,11 +93,7 @@ export default function RideDetails() {
   };
 
   const handleJoinRide = async () => {
-    if (!user) {
-      alert('Please login to join this ride');
-      return;
-    }
-
+    if (!user) { alert('Please login to join this ride'); return; }
     setActionLoading(true);
     try {
       const participantData = {
@@ -110,35 +102,16 @@ export default function RideDetails() {
         email: user.email,
         joinedAt: new Date(),
       };
-
       const rideRef = doc(db, 'rides', rideId);
       const rideDoc = await getDoc(rideRef);
-      
-      if (!rideDoc.exists()) {
-        alert('Ride not found');
-        setActionLoading(false);
-        return;
-      }
-
+      if (!rideDoc.exists()) { alert('Ride not found'); setActionLoading(false); return; }
       const currentRide = rideDoc.data();
       const currentParticipants = currentRide.participants || [];
-      
       const alreadyJoined = currentParticipants.some(p => p.userId === user.uid);
-      if (alreadyJoined) {
-        alert('You have already joined this ride');
-        setActionLoading(false);
-        return;
-      }
-
-      const updatedParticipants = [...currentParticipants, participantData];
-
-      await updateDoc(rideRef, {
-        participants: updatedParticipants,
-      });
-
+      if (alreadyJoined) { alert('You have already joined this ride'); setActionLoading(false); return; }
+      await updateDoc(rideRef, { participants: [...currentParticipants, participantData] });
       await fetchRideDetails();
       setShowJoinSuccessDialog(true);
-
     } catch (error) {
       console.error('Error joining ride:', error);
       alert(`Failed to join ride: ${error.message}`);
@@ -150,16 +123,10 @@ export default function RideDetails() {
   const handleLeaveRide = async () => {
     setShowLeaveConfirmDialog(false);
     setActionLoading(true);
-
     try {
       const updatedParticipants = ride.participants.filter(p => p.userId !== user.uid);
-
-      await updateDoc(doc(db, 'rides', rideId), {
-        participants: updatedParticipants,
-      });
-
+      await updateDoc(doc(db, 'rides', rideId), { participants: updatedParticipants });
       await fetchRideDetails();
-
     } catch (error) {
       console.error('Error leaving ride:', error);
       alert('Failed to leave ride. Please try again.');
@@ -171,15 +138,9 @@ export default function RideDetails() {
   const handleStartRide = async () => {
     setShowStartConfirmDialog(false);
     setActionLoading(true);
-
     try {
-      await updateDoc(doc(db, 'rides', rideId), {
-        status: 'ongoing',
-        startedAt: new Date(),
-      });
-
+      await updateDoc(doc(db, 'rides', rideId), { status: 'ongoing', startedAt: new Date() });
       await fetchRideDetails();
-
     } catch (error) {
       console.error('Error starting ride:', error);
       alert('Failed to start ride. Please try again.');
@@ -191,15 +152,9 @@ export default function RideDetails() {
   const handleCompleteRide = async () => {
     setShowCompleteConfirmDialog(false);
     setActionLoading(true);
-
     try {
-      await updateDoc(doc(db, 'rides', rideId), {
-        status: 'completed',
-        completedAt: new Date(),
-      });
-
+      await updateDoc(doc(db, 'rides', rideId), { status: 'completed', completedAt: new Date() });
       await fetchRideDetails();
-
     } catch (error) {
       console.error('Error completing ride:', error);
       alert('Failed to complete ride. Please try again.');
@@ -211,12 +166,10 @@ export default function RideDetails() {
   const handleCancelRide = async () => {
     setShowCancelConfirmDialog(false);
     setActionLoading(true);
-
     try {
       await deleteDoc(doc(db, 'rides', rideId));
       alert('Ride cancelled and deleted successfully!');
       navigate('/dashboard');
-
     } catch (error) {
       console.error('Error cancelling ride:', error);
       alert('Failed to cancel ride. Please try again.');
@@ -226,7 +179,7 @@ export default function RideDetails() {
   };
 
   const handleSOSClick = () => {
-    navigate('/emergency-sos');
+    navigate(`/emergency-sos/${rideId}`);
   };
 
   const formatTime = (timeString) => {
@@ -263,36 +216,14 @@ export default function RideDetails() {
   const rideStatus = ride.status || 'upcoming';
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        bgcolor: '#f5f5f5',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+
       {/* Purple Header */}
-      <Box
-        sx={{
-          background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
-          color: 'white',
-          pt: 2,
-          pb: 8,
-          px: 2,
-          position: 'relative',
-        }}
-      >
-        <IconButton
-          onClick={() => navigate('/join-ride')}
-          sx={{ color: 'white', mb: 3 }}
-        >
+      <Box sx={{ background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)', color: 'white', pt: 2, pb: 8, px: 2, position: 'relative' }}>
+        <IconButton onClick={() => navigate('/join-ride')} sx={{ color: 'white', mb: 3 }}>
           <ArrowBack />
         </IconButton>
-
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-          {ride.title}
-        </Typography>
-
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>{ride.title}</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <LocationOn sx={{ fontSize: 16 }} />
           <Typography variant="body2" sx={{ opacity: 0.95, fontSize: '0.9rem' }}>
@@ -302,51 +233,24 @@ export default function RideDetails() {
       </Box>
 
       {/* Scrollable Content */}
-      <Container 
-        maxWidth="sm" 
-        sx={{ 
-          flex: 1, 
-          px: 2, 
-          mt: -4,
-          pb: 12,
-          overflowY: 'auto',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
+      <Container maxWidth="sm" sx={{ flex: 1, px: 2, mt: -4, pb: 12, overflowY: 'auto', position: 'relative', zIndex: 1 }}>
+
         {/* Main Info Card */}
-        <Box
-          sx={{
-            bgcolor: 'white',
-            borderRadius: 5,
-            p: 2.5,
-            mb: 2,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          }}
-        >
+        <Box sx={{ bgcolor: 'white', borderRadius: 5, p: 2.5, mb: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                 <CalendarToday sx={{ fontSize: 16, color: '#7c3aed' }} />
-                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                  Date
-                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>Date</Typography>
               </Box>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                {ride.date}
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>{ride.date}</Typography>
             </Box>
-
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                 <Schedule sx={{ fontSize: 16, color: '#7c3aed' }} />
-                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                  Time
-                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>Time</Typography>
               </Box>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                {formatTime(ride.time)}
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>{formatTime(ride.time)}</Typography>
             </Box>
           </Box>
 
@@ -354,486 +258,201 @@ export default function RideDetails() {
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                 <AccessTime sx={{ fontSize: 16, color: '#7c3aed' }} />
-                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                  Duration
-                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>Duration</Typography>
               </Box>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                {ride.duration}
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>{ride.duration}</Typography>
             </Box>
-
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                 <DirectionsBike sx={{ fontSize: 16, color: '#7c3aed' }} />
-                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                  Type
-                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>Type</Typography>
               </Box>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                {ride.rideType}
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>{ride.rideType}</Typography>
             </Box>
           </Box>
 
           <Box sx={{ display: 'flex', gap: 3, pt: 2, borderTop: '1px solid #f1f5f9' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Star sx={{ fontSize: 20, color: '#f59e0b' }} />
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                4.8
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                Rating
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>4.8</Typography>
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>Rating</Typography>
             </Box>
-
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Person sx={{ fontSize: 20, color: '#7c3aed' }} />
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                {participantCount}/{maxParticipants}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                Riders
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>{participantCount}/{maxParticipants}</Typography>
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>Riders</Typography>
             </Box>
           </Box>
         </Box>
 
-        {/* View Route Map Card */}
+        {/* View Route Map */}
         <Box
-          sx={{
-            bgcolor: 'white',
-            borderRadius: 5,
-            p: 2.5,
-            mb: 2,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            '&:hover': {
-              transform: 'translateY(-2px)',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-            },
-          }}
+          sx={{ bgcolor: 'white', borderRadius: 5, p: 2.5, mb: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' } }}
           onClick={() => setShowMapViewer(true)}
         >
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 3,
-              bgcolor: '#e0f2fe',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+          <Box sx={{ width: 48, height: 48, borderRadius: 3, bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <MapIcon sx={{ fontSize: 24, color: '#0284c7' }} />
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.25 }}>
-              View Route Map
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>
-              See pathway from meetup to destination
-            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.25 }}>View Route Map</Typography>
+            <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>See pathway from meetup to destination</Typography>
           </Box>
           <ChevronRight sx={{ color: '#cbd5e1' }} />
         </Box>
 
         {/* Organizer Card */}
-        <Box
-          sx={{
-            bgcolor: 'white',
-            borderRadius: 5,
-            p: 2.5,
-            mb: 2,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 2 }}>
-            Organizer
-          </Typography>
+        <Box sx={{ bgcolor: 'white', borderRadius: 5, p: 2.5, mb: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 2 }}>Organizer</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar
-              sx={{
-                width: 56,
-                height: 56,
-                bgcolor: '#7c3aed',
-                fontSize: '1.3rem',
-                fontWeight: 700,
-              }}
-            >
+            <Avatar sx={{ width: 56, height: 56, bgcolor: '#7c3aed', fontSize: '1.3rem', fontWeight: 700 }}>
               {ride.createdByName?.charAt(0)?.toUpperCase() || 'U'}
             </Avatar>
             <Box sx={{ flex: 1 }}>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.25 }}>
-                {ride.createdByName}
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.25 }}>{ride.createdByName}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star key={star} sx={{ fontSize: 14, color: '#fbbf24' }} />
                 ))}
-                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem', ml: 0.5 }}>
-                  4.8 • 52 rides
-                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem', ml: 0.5 }}>4.8 • 52 rides</Typography>
               </Box>
             </Box>
-            <IconButton
-              sx={{
-                bgcolor: '#f3e8ff',
-                color: '#7c3aed',
-                '&:hover': { bgcolor: '#e9d5ff' },
-              }}
-            >
+            <IconButton sx={{ bgcolor: '#f3e8ff', color: '#7c3aed', '&:hover': { bgcolor: '#e9d5ff' } }}>
               <Chat sx={{ fontSize: 20 }} />
             </IconButton>
           </Box>
         </Box>
 
         {/* Participants Card */}
-        <Box
-          sx={{
-            bgcolor: 'white',
-            borderRadius: 5,
-            p: 2.5,
-            mb: 2,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-          }}
-        >
+        <Box sx={{ bgcolor: 'white', borderRadius: 5, p: 2.5, mb: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              Participants ({participantCount})
-            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Participants ({participantCount})</Typography>
             {participantCount > 0 && (
-              <Typography
-                variant="body2"
-                sx={{
-                  color: '#7c3aed',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-                onClick={() => setShowParticipantsDialog(true)}
-              >
+              <Typography variant="body2" sx={{ color: '#7c3aed', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }} onClick={() => setShowParticipantsDialog(true)}>
                 View All
               </Typography>
             )}
           </Box>
-          
           {participantCount === 0 ? (
             <Box sx={{ textAlign: 'center', py: 3, bgcolor: '#fafafa', borderRadius: 3 }}>
               <Person sx={{ fontSize: 48, color: '#cbd5e1', mb: 1 }} />
-              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                No participants yet. Be the first to join!
-              </Typography>
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>No participants yet. Be the first to join!</Typography>
             </Box>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               {ride.participants.slice(0, 4).map((participant, index) => (
-                <Avatar
-                  key={index}
-                  sx={{
-                    width: 44,
-                    height: 44,
-                    bgcolor: '#7c3aed',
-                    border: '3px solid white',
-                    ml: index > 0 ? -1.5 : 0,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                  }}
-                >
+                <Avatar key={index} sx={{ width: 44, height: 44, bgcolor: '#7c3aed', border: '3px solid white', ml: index > 0 ? -1.5 : 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', fontSize: '1rem', fontWeight: 700 }}>
                   {participant.name?.charAt(0)?.toUpperCase() || 'U'}
                 </Avatar>
               ))}
               {participantCount > 4 && (
-                <Box
-                  sx={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: '50%',
-                    bgcolor: '#f3e8ff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    ml: -1.5,
-                    border: '3px solid white',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem' }}>
-                    +{participantCount - 4}
-                  </Typography>
+                <Box sx={{ width: 44, height: 44, borderRadius: '50%', bgcolor: '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center', ml: -1.5, border: '3px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#7c3aed', fontSize: '0.85rem' }}>+{participantCount - 4}</Typography>
                 </Box>
               )}
             </Box>
           )}
         </Box>
 
-        {/* Description Card */}
+        {/* Description */}
         {ride.description && (
-          <Box
-            sx={{
-              bgcolor: 'white',
-              borderRadius: 5,
-              p: 2.5,
-              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-              mb: 2,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 1.5 }}>
-              Description
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.7 }}>
-              {ride.description}
-            </Typography>
+          <Box sx={{ bgcolor: 'white', borderRadius: 5, p: 2.5, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 1.5 }}>Description</Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.7 }}>{ride.description}</Typography>
           </Box>
         )}
       </Container>
 
-      {/* Floating SOS Button - Only for ongoing rides */}
+      {/* Floating SOS Button */}
       {rideStatus === 'ongoing' && (isParticipant || isOrganizer) && (
         <Fab
           onClick={handleSOSClick}
-          sx={{
-            position: 'fixed',
-            bottom: 120,
-            right: 20,
-            bgcolor: '#ef4444',
-            color: 'white',
-            width: 70,
-            height: 70,
-            zIndex: 9998,
-            '&:hover': {
-              bgcolor: '#dc2626',
-            },
-            boxShadow: '0 8px 24px rgba(239,68,68,0.4)',
-          }}
+          sx={{ position: 'fixed', bottom: 120, right: 20, bgcolor: '#ef4444', color: 'white', width: 70, height: 70, zIndex: 9998, '&:hover': { bgcolor: '#dc2626' }, boxShadow: '0 8px 24px rgba(239,68,68,0.4)' }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            SOS
-          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>SOS</Typography>
         </Fab>
       )}
 
       {/* Bottom Action Buttons */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          bgcolor: 'white',
-          borderTop: '1px solid #e5e7eb',
-          p: 2,
-          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)',
-          zIndex: 9999,
-        }}
-      >
+      <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, bgcolor: 'white', borderTop: '1px solid #e5e7eb', p: 2, boxShadow: '0 -4px 12px rgba(0,0,0,0.05)', zIndex: 9999 }}>
         <Container maxWidth="sm" sx={{ display: 'flex', gap: 2 }}>
-          {/* ORGANIZER - Upcoming Ride */}
+
+          {/* ORGANIZER - Upcoming */}
           {isOrganizer && rideStatus === 'upcoming' && (
             <>
-              <Button
-                variant="outlined"
-                startIcon={<Cancel />}
-                onClick={() => setShowCancelConfirmDialog(true)}
-                disabled={actionLoading}
-                sx={{
-                  flex: 1,
-                  color: '#ef4444',
-                  borderColor: '#ef4444',
-                  py: 1.5,
-                  fontSize: '0.95rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  borderRadius: 4,
-                  borderWidth: 2,
-                  '&:hover': {
-                    borderColor: '#dc2626',
-                    bgcolor: 'transparent',
-                    borderWidth: 2,
-                  },
-                }}
-              >
+              <Button variant="outlined" startIcon={<Cancel />} onClick={() => setShowCancelConfirmDialog(true)} disabled={actionLoading}
+                sx={{ flex: 1, color: '#ef4444', borderColor: '#ef4444', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, borderWidth: 2, '&:hover': { borderColor: '#dc2626', bgcolor: 'transparent', borderWidth: 2 } }}>
                 Cancel Ride
               </Button>
-              <Button
-                variant="contained"
-                startIcon={<PlayArrow />}
-                onClick={() => setShowStartConfirmDialog(true)}
-                disabled={actionLoading}
-                sx={{
-                  flex: 1,
-                  bgcolor: '#10b981',
-                  color: 'white',
-                  py: 1.5,
-                  fontSize: '0.95rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  borderRadius: 4,
-                  '&:hover': {
-                    bgcolor: '#059669',
-                  },
-                }}
-              >
+              <Button variant="contained" startIcon={<PlayArrow />} onClick={() => setShowStartConfirmDialog(true)} disabled={actionLoading}
+                sx={{ flex: 1, bgcolor: '#10b981', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: '#059669' } }}>
                 Start Ride
               </Button>
             </>
           )}
 
-          {/* ORGANIZER - Ongoing Ride */}
+          {/* ORGANIZER - Ongoing */}
           {isOrganizer && rideStatus === 'ongoing' && (
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<CheckCircleOutline />}
-              onClick={() => setShowCompleteConfirmDialog(true)}
-              disabled={actionLoading}
-              sx={{
-                bgcolor: '#7c3aed',
-                color: 'white',
-                py: 1.5,
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                borderRadius: 4,
-                '&:hover': {
-                  bgcolor: '#6d28d9',
-                },
-              }}
-            >
+            <Button fullWidth variant="contained" startIcon={<CheckCircleOutline />} onClick={() => setShowCompleteConfirmDialog(true)} disabled={actionLoading}
+              sx={{ bgcolor: '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: '#6d28d9' } }}>
               Complete Ride
             </Button>
           )}
 
-          {/* PARTICIPANT - Upcoming Ride */}
+          {/* PARTICIPANT - Upcoming */}
           {!isOrganizer && rideStatus === 'upcoming' && (
             <>
-              <Button
-                variant="outlined"
-                startIcon={<Chat />}
-                sx={{
-                  flex: 1,
-                  color: '#7c3aed',
-                  borderColor: '#7c3aed',
-                  py: 1.5,
-                  fontSize: '0.95rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  borderRadius: 4,
-                  borderWidth: 2,
-                  '&:hover': {
-                    borderColor: '#6d28d9',
-                    bgcolor: 'transparent',
-                    borderWidth: 2,
-                  },
-                }}
-              >
+              <Button variant="outlined" startIcon={<Chat />} onClick={() => navigate(`/chat/${rideId}`)}
+                sx={{ flex: 1, color: '#7c3aed', borderColor: '#7c3aed', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, borderWidth: 2, '&:hover': { borderColor: '#6d28d9', bgcolor: 'transparent', borderWidth: 2 } }}>
                 Open Chat
               </Button>
-              
               {isParticipant ? (
-                <Button
-                  variant="contained"
-                  startIcon={<ExitToApp />}
-                  onClick={() => setShowLeaveConfirmDialog(true)}
-                  disabled={actionLoading}
-                  sx={{
-                    flex: 1,
-                    bgcolor: '#ef4444',
-                    color: 'white',
-                    py: 1.5,
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    borderRadius: 4,
-                    '&:hover': {
-                      bgcolor: '#dc2626',
-                    },
-                  }}
-                >
+                <Button variant="contained" startIcon={<ExitToApp />} onClick={() => setShowLeaveConfirmDialog(true)} disabled={actionLoading}
+                  sx={{ flex: 1, bgcolor: '#ef4444', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: '#dc2626' } }}>
                   Leave Ride
                 </Button>
               ) : (
-                <Button
-                  variant="contained"
-                  startIcon={<Person />}
-                  onClick={handleJoinRide}
-                  disabled={actionLoading || isFull}
-                  sx={{
-                    flex: 1,
-                    bgcolor: '#7c3aed',
-                    color: 'white',
-                    py: 1.5,
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    borderRadius: 4,
-                    '&:hover': {
-                      bgcolor: '#6d28d9',
-                    },
-                    '&:disabled': {
-                      bgcolor: '#cbd5e1',
-                    },
-                  }}
-                >
+                <Button variant="contained" startIcon={<Person />} onClick={handleJoinRide} disabled={actionLoading || isFull}
+                  sx={{ flex: 1, bgcolor: '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: '#6d28d9' }, '&:disabled': { bgcolor: '#cbd5e1' } }}>
                   {actionLoading ? <CircularProgress size={24} color="inherit" /> : isFull ? 'Ride Full' : 'Join Ride'}
                 </Button>
               )}
             </>
           )}
 
-          {/* PARTICIPANT - Ongoing Ride */}
+          {/* PARTICIPANT - Ongoing */}
           {!isOrganizer && rideStatus === 'ongoing' && (
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<Chat />}
-              sx={{
-                color: '#7c3aed',
-                borderColor: '#7c3aed',
-                py: 1.5,
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                borderRadius: 4,
-                borderWidth: 2,
-                '&:hover': {
-                  borderColor: '#6d28d9',
-                  bgcolor: 'transparent',
-                  borderWidth: 2,
-                },
-              }}
-            >
+            <Button fullWidth variant="outlined" startIcon={<Chat />} onClick={() => navigate(`/chat/${rideId}`)}
+              sx={{ color: '#7c3aed', borderColor: '#7c3aed', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, borderWidth: 2, '&:hover': { borderColor: '#6d28d9', bgcolor: 'transparent', borderWidth: 2 } }}>
               Open Chat
             </Button>
           )}
 
-          {/* Completed Ride */}
+          {/* COMPLETED */}
           {rideStatus === 'completed' && (
-            <Box sx={{ flex: 1, textAlign: 'center', py: 1 }}>
-              <CheckCircleOutline sx={{ fontSize: 40, color: '#10b981', mb: 1 }} />
-              <Typography variant="body1" sx={{ color: '#64748b', fontWeight: 600 }}>
-                This ride has been completed
-              </Typography>
+            <Box sx={{ flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <CheckCircleOutline sx={{ fontSize: 32, color: '#10b981' }} />
+                <Typography variant="caption" sx={{ display: 'block', color: '#10b981', fontWeight: 600 }}>Completed</Typography>
+              </Box>
+              {isParticipant && (
+                <Button fullWidth variant="contained" startIcon={<Star />} onClick={() => navigate(`/rate-ride/${rideId}`)}
+                  sx={{ bgcolor: '#f59e0b', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 700, textTransform: 'none', borderRadius: 4, boxShadow: '0 4px 12px rgba(245,158,11,0.3)', '&:hover': { bgcolor: '#d97706' } }}>
+                  Rate This Ride
+                </Button>
+              )}
+              {isOrganizer && !isParticipant && (
+                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, flex: 1, textAlign: 'center' }}>
+                  Ride completed successfully
+                </Typography>
+              )}
             </Box>
           )}
+
         </Container>
       </Box>
 
-      {/* Dialogs */}
-      <RouteMapViewer
-        open={showMapViewer}
-        onClose={() => setShowMapViewer(false)}
-        meetingPoint={ride.meetingPoint}
-        destination={ride.destination}
-        meetingPointCoords={ride.meetingPointCoords}
-        destinationCoords={ride.destinationCoords}
-      />
+      {/* All Dialogs */}
+      <RouteMapViewer open={showMapViewer} onClose={() => setShowMapViewer(false)} meetingPoint={ride.meetingPoint} destination={ride.destination} meetingPointCoords={ride.meetingPointCoords} destinationCoords={ride.destinationCoords} />
 
       <Dialog open={showJoinSuccessDialog} onClose={() => setShowJoinSuccessDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 1, maxWidth: '400px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
@@ -910,9 +529,7 @@ export default function RideDetails() {
         <DialogTitle sx={{ pb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Participants ({participantCount})</Typography>
-            <IconButton onClick={() => setShowParticipantsDialog(false)} size="small" sx={{ color: '#64748b' }}>
-              <Close />
-            </IconButton>
+            <IconButton onClick={() => setShowParticipantsDialog(false)} size="small" sx={{ color: '#64748b' }}><Close /></IconButton>
           </Box>
         </DialogTitle>
         <DialogContent sx={{ px: 2, py: 0 }}>
@@ -939,6 +556,7 @@ export default function RideDetails() {
           </Box>
         </DialogContent>
       </Dialog>
+
     </Box>
   );
 }

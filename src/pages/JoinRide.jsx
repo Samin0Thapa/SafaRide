@@ -15,6 +15,8 @@ import {
   Menu,
   MenuItem,
   Badge,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -27,6 +29,7 @@ import {
   ArrowForward,
   Chat,
   Home,
+  Star,
   Badge as BadgeIcon,
 } from '@mui/icons-material';
 
@@ -34,12 +37,14 @@ export default function JoinRide() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [rides, setRides] = useState([]);
+  const [completedRides, setCompletedRides] = useState([]);
   const [filteredRides, setFilteredRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterAnchor, setFilterAnchor] = useState(null);
   const [selectedFilter, setSelectedFilter] = useState('All Rides');
   const [userRole, setUserRole] = useState(null);
+  const [activeTab, setActiveTab] = useState(0); // 0 = Active, 1 = Completed
 
   // Listen for auth state changes
   useEffect(() => {
@@ -80,22 +85,24 @@ export default function JoinRide() {
     fetchRides();
   }, []);
 
+  // Re-filter when tab or filter changes
   useEffect(() => {
+    const source = activeTab === 0 ? rides : completedRides;
     if (selectedFilter === 'All Rides') {
-      setFilteredRides(rides);
+      setFilteredRides(source);
     } else {
-      setFilteredRides(rides.filter(ride => ride.rideType === selectedFilter));
+      setFilteredRides(source.filter(ride => ride.rideType === selectedFilter));
     }
-  }, [selectedFilter, rides]);
+  }, [selectedFilter, rides, completedRides, activeTab]);
 
   const fetchRides = async () => {
     try {
       setLoading(true);
       setError('');
-      
-      // Fetch both upcoming AND ongoing rides
+
       const ridesData = [];
-      
+      const completedData = [];
+
       // Get upcoming rides
       const upcomingQuery = query(
         collection(db, 'rides'),
@@ -122,9 +129,23 @@ export default function JoinRide() {
         });
       });
 
+      // Get completed rides
+      const completedQuery = query(
+        collection(db, 'rides'),
+        where('status', '==', 'completed')
+      );
+      const completedSnapshot = await getDocs(completedQuery);
+      completedSnapshot.forEach((doc) => {
+        completedData.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
+
       setRides(ridesData);
-      setFilteredRides(ridesData);
-      
+      setCompletedRides(completedData);
+      setFilteredRides(ridesData); // default to active tab
+
     } catch (error) {
       console.error('Error fetching rides:', error);
       setError(`Failed to load rides: ${error.message}`);
@@ -146,6 +167,11 @@ export default function JoinRide() {
     handleFilterClose();
   };
 
+  const handleTabChange = (e, val) => {
+    setActiveTab(val);
+    setSelectedFilter('All Rides');
+  };
+
   const handleViewDetails = (rideId) => {
     navigate(`/ride-details/${rideId}`);
   };
@@ -165,8 +191,8 @@ export default function JoinRide() {
   const formatDate = (dateString) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
         day: 'numeric',
       });
     } catch (e) {
@@ -184,6 +210,15 @@ export default function JoinRide() {
     } catch (e) {
       return timeString;
     }
+  };
+
+  // Check if current user is a participant of a ride
+  const isUserParticipant = (ride) => {
+    if (!user) return false;
+    return Array.isArray(ride.participants) &&
+      ride.participants.some(p =>
+        (typeof p === 'object' && p.userId === user.uid) || p === user.uid
+      );
   };
 
   return (
@@ -215,10 +250,10 @@ export default function JoinRide() {
             <ArrowBack />
           </IconButton>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Join a Ride
+            {activeTab === 0 ? 'Join a Ride' : 'Completed Rides'}
           </Typography>
         </Box>
-        
+
         <IconButton
           onClick={handleFilterClick}
           sx={{
@@ -231,6 +266,35 @@ export default function JoinRide() {
             <FilterList />
           </Badge>
         </IconButton>
+      </Box>
+
+      {/* Tabs - Active / Completed */}
+      <Box sx={{ bgcolor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' }}>
+        <Container maxWidth="sm">
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="fullWidth"
+            sx={{
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                color: '#64748b',
+              },
+              '& .Mui-selected': {
+                color: '#7c3aed',
+              },
+              '& .MuiTabs-indicator': {
+                backgroundColor: '#7c3aed',
+                height: 3,
+              },
+            }}
+          >
+            <Tab label={`Active (${rides.length})`} />
+            <Tab label={`Completed (${completedRides.length})`} />
+          </Tabs>
+        </Container>
       </Box>
 
       {/* Filter Menu */}
@@ -269,6 +333,7 @@ export default function JoinRide() {
 
       {/* Content */}
       <Container maxWidth="sm" sx={{ py: 3, px: 2, flex: 1, pb: 10 }}>
+
         {/* Active Filter Display */}
         {selectedFilter !== 'All Rides' && (
           <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -325,16 +390,16 @@ export default function JoinRide() {
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <DirectionsBike sx={{ fontSize: 80, color: '#cbd5e1', mb: 2 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
-              {selectedFilter === 'All Rides' 
-                ? 'No rides available' 
-                : `No ${selectedFilter}s available`}
+              {activeTab === 0
+                ? selectedFilter === 'All Rides' ? 'No rides available' : `No ${selectedFilter}s available`
+                : 'No completed rides yet'}
             </Typography>
             <Typography variant="body2" sx={{ color: '#94a3b8', mb: 2 }}>
-              {selectedFilter === 'All Rides' 
-                ? 'Be the first to create a ride!' 
-                : 'Try a different filter or create a ride!'}
+              {activeTab === 0
+                ? selectedFilter === 'All Rides' ? 'Be the first to create a ride!' : 'Try a different filter or create a ride!'
+                : 'Completed rides will appear here so you can rate them'}
             </Typography>
-            {(userRole === 'organizer' || userRole === 'admin') && (
+            {activeTab === 0 && (userRole === 'organizer' || userRole === 'admin') && (
               <Button
                 variant="contained"
                 onClick={() => navigate('/create-ride')}
@@ -354,140 +419,134 @@ export default function JoinRide() {
         {/* Rides List */}
         {!loading && !error && filteredRides.length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            {filteredRides.map((ride) => (
-              <Card
-                key={ride.id}
-                sx={{
-                  borderRadius: 4,
-                  transition: 'all 0.2s',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 20px rgba(124,58,237,0.15)',
-                  },
-                }}
-              >
-                <CardContent sx={{ p: 3 }}>
-                  {/* Top Section: Icon + Title + Participants */}
-                  <Box sx={{ display: 'flex', gap: 2, mb: 2.5 }}>
-                    {/* Icon */}
-                    <Box
-                      sx={{
-                        width: 56,
-                        height: 56,
-                        minWidth: 56,
-                        borderRadius: 3,
-                        bgcolor: '#f3e8ff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <DirectionsBike sx={{ fontSize: 32, color: '#7c3aed' }} />
-                    </Box>
+            {filteredRides.map((ride) => {
+              const isCompleted = ride.status === 'completed';
+              const userIsParticipant = isUserParticipant(ride);
 
-                    {/* Title and Route */}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography 
-                        variant="h6" 
-                        sx={{ 
-                          fontWeight: 700, 
-                          color: '#1e293b',
-                          fontSize: '1.1rem',
-                          mb: 0.5,
+              return (
+                <Card
+                  key={ride.id}
+                  sx={{
+                    borderRadius: 4,
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    border: isCompleted ? '1px solid #e2e8f0' : 'none',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 20px rgba(124,58,237,0.15)',
+                    },
+                  }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+
+                    {/* Top Section: Icon + Title + Participants */}
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2.5 }}>
+
+                      {/* Icon */}
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          minWidth: 56,
+                          borderRadius: 3,
+                          bgcolor: isCompleted ? '#f1f5f9' : '#f3e8ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
                       >
-                        {ride.title}
-                      </Typography>
+                        <DirectionsBike sx={{ fontSize: 32, color: isCompleted ? '#94a3b8' : '#7c3aed' }} />
+                      </Box>
 
-                      {/* Route: Meeting Point → Destination */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            color: '#64748b', 
-                            fontSize: '0.9rem',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
+                      {/* Title and Route */}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 700,
+                            color: '#1e293b',
+                            fontSize: '1.1rem',
+                            mb: 0.5,
                           }}
                         >
-                          {ride.meetingPoint}
+                          {ride.title}
                         </Typography>
-                        <ArrowForward sx={{ fontSize: 16, color: '#94a3b8' }} />
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            color: '#64748b', 
-                            fontSize: '0.9rem',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {ride.destination}
+
+                        {/* Route: Meeting Point → Destination */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: '#64748b',
+                              fontSize: '0.9rem',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {ride.meetingPoint}
+                          </Typography>
+                          <ArrowForward sx={{ fontSize: 16, color: '#94a3b8' }} />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: '#64748b',
+                              fontSize: '0.9rem',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {ride.destination}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Participants */}
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          bgcolor: '#f0f9ff',
+                          px: 1.5,
+                          py: 0.75,
+                          borderRadius: 2,
+                          height: 'fit-content',
+                        }}
+                      >
+                        <Person sx={{ fontSize: 18, color: '#3b82f6' }} />
+                        <Typography variant="body2" sx={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>
+                          {ride.participants?.length || 0}/{ride.maxParticipants || 10}
                         </Typography>
                       </Box>
                     </Box>
 
-                    {/* Participants */}
-                    <Box 
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 0.5,
-                        bgcolor: '#f0f9ff',
-                        px: 1.5,
-                        py: 0.75,
-                        borderRadius: 2,
-                        height: 'fit-content',
-                      }}
-                    >
-                      <Person sx={{ fontSize: 18, color: '#3b82f6' }} />
-                      <Typography variant="body2" sx={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>
-                        {ride.participants?.length || 0}/{ride.maxParticipants || 10}
-                      </Typography>
+                    {/* Date & Time */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <CalendarToday sx={{ fontSize: 16, color: '#7c3aed' }} />
+                        <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+                          {formatDate(ride.date)}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Schedule sx={{ fontSize: 16, color: '#7c3aed' }} />
+                        <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+                          {formatTime(ride.time)}
+                        </Typography>
+                      </Box>
                     </Box>
-                  </Box>
 
-                  {/* Date & Time */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                      <CalendarToday sx={{ fontSize: 16, color: '#7c3aed' }} />
-                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.9rem' }}>
-                        {formatDate(ride.date)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                      <Schedule sx={{ fontSize: 16, color: '#7c3aed' }} />
-                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.9rem' }}>
-                        {formatTime(ride.time)}
-                      </Typography>
-                    </Box>
-                  </Box>
+                    {/* Bottom Section: Ride Type + Status + Button */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
 
-                  {/* Bottom Section: Ride Type + Status + View Details Button */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                    {/* Left: Ride Type + Status Badge */}
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      <Chip
-                        label={ride.rideType}
-                        sx={{
-                          bgcolor: getRideTypeColor(ride.rideType),
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: '0.8rem',
-                          height: 32,
-                          borderRadius: 2,
-                        }}
-                      />
-
-                      {/* ONGOING BADGE */}
-                      {ride.status === 'ongoing' && (
+                      {/* Left: Ride Type + Status Badge */}
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Chip
-                          label="Ongoing"
+                          label={ride.rideType}
                           sx={{
-                            bgcolor: '#f59e0b',
+                            bgcolor: getRideTypeColor(ride.rideType),
                             color: 'white',
                             fontWeight: 600,
                             fontSize: '0.8rem',
@@ -495,35 +554,92 @@ export default function JoinRide() {
                             borderRadius: 2,
                           }}
                         />
+
+                        {/* ONGOING BADGE */}
+                        {ride.status === 'ongoing' && (
+                          <Chip
+                            label="Live"
+                            sx={{
+                              bgcolor: '#10b981',
+                              color: 'white',
+                              fontWeight: 600,
+                              fontSize: '0.8rem',
+                              height: 32,
+                              borderRadius: 2,
+                            }}
+                          />
+                        )}
+
+                        {/* COMPLETED BADGE */}
+                        {ride.status === 'completed' && (
+                          <Chip
+                            label="Completed"
+                            sx={{
+                              bgcolor: '#f1f5f9',
+                              color: '#64748b',
+                              fontWeight: 600,
+                              fontSize: '0.8rem',
+                              height: 32,
+                              borderRadius: 2,
+                            }}
+                          />
+                        )}
+                      </Box>
+
+                      {/* Rate Ride button for participants of completed rides */}
+                      {isCompleted && userIsParticipant ? (
+                        <Button
+                          variant="contained"
+                          startIcon={<Star sx={{ fontSize: 18 }} />}
+                          onClick={() => navigate(`/rate-ride/${ride.id}`)}
+                          sx={{
+                            bgcolor: '#f59e0b',
+                            color: 'white',
+                            px: 2.5,
+                            py: 1,
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            textTransform: 'none',
+                            borderRadius: 3,
+                            boxShadow: '0 4px 12px rgba(245,158,11,0.3)',
+                            flexShrink: 0,
+                            '&:hover': {
+                              bgcolor: '#d97706',
+                            },
+                          }}
+                        >
+                          Rate Ride
+                        </Button>
+                      ) : (
+                        /* View Details for everything else */
+                        <Button
+                          variant="contained"
+                          onClick={() => handleViewDetails(ride.id)}
+                          sx={{
+                            bgcolor: '#7c3aed',
+                            color: 'white',
+                            px: 3,
+                            py: 1,
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            borderRadius: 3,
+                            boxShadow: 'none',
+                            flexShrink: 0,
+                            '&:hover': {
+                              bgcolor: '#6d28d9',
+                              boxShadow: '0 4px 12px rgba(124,58,237,0.3)',
+                            },
+                          }}
+                        >
+                          View Details
+                        </Button>
                       )}
                     </Box>
-
-                    {/* View Details Button */}
-                    <Button
-                      variant="contained"
-                      onClick={() => handleViewDetails(ride.id)}
-                      sx={{
-                        bgcolor: '#7c3aed',
-                        color: 'white',
-                        px: 3,
-                        py: 1,
-                        fontSize: '0.9rem',
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        borderRadius: 3,
-                        boxShadow: 'none',
-                        '&:hover': {
-                          bgcolor: '#6d28d9',
-                          boxShadow: '0 4px 12px rgba(124,58,237,0.3)',
-                        },
-                      }}
-                    >
-                      View Details
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </Box>
         )}
       </Container>
