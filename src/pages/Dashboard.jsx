@@ -412,7 +412,7 @@ export default function Dashboard() {
               transition: 'transform 0.2s',
               '&:hover': { transform: 'translateY(-2px)' },
             }}
-            onClick={() => alert('/chat')}
+            onClick={() => navigate('/chat')}
           >
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
