@@ -43,11 +43,13 @@ export default function AdminDashboard() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [approvedOrganizers, setApprovedOrganizers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Dialog states
   const [showRequestDetailsDialog, setShowRequestDetailsDialog] = useState(false);
   const [showApprovedOrganizersDialog, setShowApprovedOrganizersDialog] = useState(false);
+  const [showOrganizerDetailsDialog, setShowOrganizerDetailsDialog] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedOrganizer, setSelectedOrganizer] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -121,30 +123,24 @@ export default function AdminDashboard() {
 
   const handleApprove = async () => {
     if (!selectedRequest) return;
-    
+
     setActionLoading(true);
     try {
-      // Update verification request status
       await updateDoc(doc(db, 'verificationRequests', selectedRequest.id), {
         status: 'approved',
         approvedAt: new Date(),
       });
 
-      // Update user role to 'organizer'
       await updateDoc(doc(db, 'users', selectedRequest.userId), {
         role: 'organizer',
         verified: true,
       });
 
       console.log('Request approved successfully');
-      
-      // Refresh data
       await fetchDashboardData();
-      
-      // Close dialog
       setShowRequestDetailsDialog(false);
       setSelectedRequest(null);
-      
+
     } catch (error) {
       console.error('Error approving request:', error);
       alert('Failed to approve request. Please try again.');
@@ -155,27 +151,44 @@ export default function AdminDashboard() {
 
   const handleReject = async () => {
     if (!selectedRequest) return;
-    
+
     setActionLoading(true);
     try {
-      // Update verification request status
       await updateDoc(doc(db, 'verificationRequests', selectedRequest.id), {
         status: 'rejected',
         rejectedAt: new Date(),
       });
 
       console.log('Request rejected successfully');
-      
-      // Refresh data
       await fetchDashboardData();
-      
-      // Close dialog
       setShowRequestDetailsDialog(false);
       setSelectedRequest(null);
-      
+
     } catch (error) {
       console.error('Error rejecting request:', error);
       alert('Failed to reject request. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveOrganizer = async (organizer) => {
+    setActionLoading(true);
+    try {
+      await updateDoc(doc(db, 'users', organizer.id), {
+        role: 'rider',
+        verified: false,
+      });
+
+      console.log('Organizer removed successfully');
+      await fetchDashboardData();
+      setShowApprovedOrganizersDialog(false);
+      setShowOrganizerDetailsDialog(false);
+      setSelectedOrganizer(null);
+
+    } catch (error) {
+      console.error('Error removing organizer:', error);
+      alert('Failed to remove organizer. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -246,6 +259,7 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <Container maxWidth="sm" sx={{ mt: -4, px: 2, position: 'relative', zIndex: 10 }}>
+
         {/* Stats Cards - 2x2 Grid */}
         <Box
           sx={{
@@ -256,12 +270,7 @@ export default function AdminDashboard() {
           }}
         >
           {/* Total Users */}
-          <Card
-            sx={{
-              borderRadius: 4,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            }}
-          >
+          <Card sx={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <CardContent sx={{ textAlign: 'center', py: 3 }}>
               <Box
                 sx={{
@@ -288,12 +297,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Total Rides */}
-          <Card
-            sx={{
-              borderRadius: 4,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            }}
-          >
+          <Card sx={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <CardContent sx={{ textAlign: 'center', py: 3 }}>
               <Box
                 sx={{
@@ -320,12 +324,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Pending Requests */}
-          <Card
-            sx={{
-              borderRadius: 4,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            }}
-          >
+          <Card sx={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <CardContent sx={{ textAlign: 'center', py: 3 }}>
               <Box
                 sx={{
@@ -352,12 +351,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Verified Organizers */}
-          <Card
-            sx={{
-              borderRadius: 4,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            }}
-          >
+          <Card sx={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <CardContent sx={{ textAlign: 'center', py: 3 }}>
               <Box
                 sx={{
@@ -400,9 +394,7 @@ export default function AdminDashboard() {
             borderRadius: 3,
             mb: 3,
             boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-            '&:hover': {
-              bgcolor: '#059669',
-            },
+            '&:hover': { bgcolor: '#059669' },
           }}
         >
           View Approved Organizers List
@@ -431,12 +423,7 @@ export default function AdminDashboard() {
 
           {/* Pending Requests List */}
           {pendingRequests.length === 0 ? (
-            <Card
-              sx={{
-                borderRadius: 4,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              }}
-            >
+            <Card sx={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
               <CardContent sx={{ textAlign: 'center', py: 4 }}>
                 <Schedule sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
                 <Typography variant="body1" sx={{ color: '#64748b' }}>
@@ -509,9 +496,7 @@ export default function AdminDashboard() {
                         fontWeight: 600,
                         textTransform: 'none',
                         borderRadius: 3,
-                        '&:hover': {
-                          bgcolor: '#6d28d9',
-                        },
+                        '&:hover': { bgcolor: '#6d28d9' },
                       }}
                     >
                       👁️ View Details
@@ -530,12 +515,7 @@ export default function AdminDashboard() {
         onClose={() => setShowRequestDetailsDialog(false)}
         maxWidth="xs"
         fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            m: 2,
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 4, m: 2 } }}
       >
         <DialogTitle sx={{ pb: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -551,10 +531,9 @@ export default function AdminDashboard() {
             </IconButton>
           </Box>
         </DialogTitle>
-        
+
         {selectedRequest && (
           <DialogContent sx={{ px: 3, py: 2 }}>
-            {/* Profile Section */}
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <Avatar
                 sx={{
@@ -577,7 +556,6 @@ export default function AdminDashboard() {
               </Typography>
             </Box>
 
-            {/* Stats Section */}
             <Box
               sx={{
                 display: 'flex',
@@ -607,53 +585,33 @@ export default function AdminDashboard() {
               </Box>
             </Box>
 
-            {/* Details List */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {/* Phone */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Phone
-                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Phone</Typography>
                 <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
                   {selectedRequest.phone || 'N/A'}
                 </Typography>
               </Box>
-
-              {/* Experience */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Experience
-                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Experience</Typography>
                 <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
                   {selectedRequest.experience || 'N/A'}
                 </Typography>
               </Box>
-
-              {/* License No. */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  License No.
-                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>License No.</Typography>
                 <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
                   {selectedRequest.licenseNumber || 'N/A'}
                 </Typography>
               </Box>
-
-              {/* Motorcycle */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Motorcycle
-                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Motorcycle</Typography>
                 <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
                   {selectedRequest.motorcycleModel || 'N/A'}
                 </Typography>
               </Box>
-
-              {/* Request Date */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Request Date
-                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Request Date</Typography>
                 <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
                   {formatDate(selectedRequest.createdAt)}
                 </Typography>
@@ -674,9 +632,7 @@ export default function AdminDashboard() {
               fontWeight: 600,
               textTransform: 'none',
               borderRadius: 2,
-              '&:hover': {
-                bgcolor: '#fef2f2',
-              },
+              '&:hover': { bgcolor: '#fef2f2' },
             }}
           >
             Reject
@@ -694,9 +650,7 @@ export default function AdminDashboard() {
               fontWeight: 600,
               textTransform: 'none',
               borderRadius: 2,
-              '&:hover': {
-                bgcolor: '#059669',
-              },
+              '&:hover': { bgcolor: '#059669' },
             }}
           >
             {actionLoading ? <CircularProgress size={24} color="inherit" /> : 'Approve'}
@@ -732,7 +686,7 @@ export default function AdminDashboard() {
             </IconButton>
           </Box>
         </DialogTitle>
-        
+
         <DialogContent sx={{ px: 2, py: 0 }}>
           {approvedOrganizers.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -792,8 +746,13 @@ export default function AdminDashboard() {
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 1 }}>
+                      {/* View Details - now works */}
                       <Button
                         size="small"
+                        onClick={() => {
+                          setSelectedOrganizer(organizer);
+                          setShowOrganizerDetailsDialog(true);
+                        }}
                         sx={{
                           flex: 1,
                           color: '#7c3aed',
@@ -802,15 +761,17 @@ export default function AdminDashboard() {
                           fontWeight: 600,
                           textTransform: 'none',
                           borderRadius: 2,
-                          '&:hover': {
-                            bgcolor: '#f3e8ff',
-                          },
+                          '&:hover': { bgcolor: '#f3e8ff' },
                         }}
                       >
                         View Details
                       </Button>
+
+                      {/* Remove - now works */}
                       <Button
                         size="small"
+                        disabled={actionLoading}
+                        onClick={() => handleRemoveOrganizer(organizer)}
                         sx={{
                           flex: 1,
                           color: '#ef4444',
@@ -819,12 +780,10 @@ export default function AdminDashboard() {
                           fontWeight: 600,
                           textTransform: 'none',
                           borderRadius: 2,
-                          '&:hover': {
-                            bgcolor: '#fef2f2',
-                          },
+                          '&:hover': { bgcolor: '#fef2f2' },
                         }}
                       >
-                        Remove
+                        {actionLoading ? <CircularProgress size={16} color="inherit" /> : 'Remove'}
                       </Button>
                     </Box>
                   </CardContent>
@@ -834,6 +793,152 @@ export default function AdminDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Organizer Details Dialog */}
+      <Dialog
+        open={showOrganizerDetailsDialog}
+        onClose={() => setShowOrganizerDetailsDialog(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, m: 2 } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Organizer Details
+            </Typography>
+            <IconButton
+              onClick={() => setShowOrganizerDetailsDialog(false)}
+              size="small"
+              sx={{ color: '#64748b' }}
+            >
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        {selectedOrganizer && (
+          <DialogContent sx={{ px: 3, py: 2 }}>
+            {/* Profile */}
+            <Box sx={{ textAlign: 'center', mb: 3 }}>
+              <Avatar
+                sx={{
+                  width: 80,
+                  height: 80,
+                  bgcolor: '#10b981',
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  margin: '0 auto',
+                  mb: 1.5,
+                }}
+              >
+                {selectedOrganizer.name?.charAt(0)?.toUpperCase() || 'O'}
+              </Avatar>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
+                {selectedOrganizer.name || 'Unknown'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+                {selectedOrganizer.email || 'No email'}
+              </Typography>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  bgcolor: '#d1fae5',
+                  color: '#10b981',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  mt: 1,
+                }}
+              >
+                <VerifiedUser sx={{ fontSize: 14 }} />
+                Verified Organizer
+              </Box>
+            </Box>
+
+            {/* Stats */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-around',
+                bgcolor: '#f8fafc',
+                borderRadius: 3,
+                p: 2,
+                mb: 3,
+              }}
+            >
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#7c3aed', mb: 0.5 }}>
+                  {selectedOrganizer.rating || 'N/A'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                  Trust Score
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#4f46e5', mb: 0.5 }}>
+                  {selectedOrganizer.totalReviews || 0}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                  Total Reviews
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Details */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Email</Typography>
+                <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
+                  {selectedOrganizer.email || 'N/A'}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Role</Typography>
+                <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
+                  {selectedOrganizer.role || 'N/A'}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Member Since</Typography>
+                <Typography variant="body2" sx={{ color: '#1e293b', fontWeight: 600 }}>
+                  {formatDate(selectedOrganizer.createdAt)}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>Verified</Typography>
+                <Typography variant="body2" sx={{ color: '#10b981', fontWeight: 600 }}>
+                  ✓ Yes
+                </Typography>
+              </Box>
+            </Box>
+          </DialogContent>
+        )}
+
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={() => setShowOrganizerDetailsDialog(false)}
+            sx={{
+              bgcolor: '#7c3aed',
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 2,
+              '&:hover': { bgcolor: '#6d28d9' },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 }
