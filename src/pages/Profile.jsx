@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import {
   Box,
   Container,
@@ -28,6 +28,7 @@ import {
   CalendarToday,
   LocationOn,
   Logout,
+  EmojiEvents,
 } from '@mui/icons-material';
 
 export default function Profile() {
@@ -37,11 +38,13 @@ export default function Profile() {
   const [recentRides, setRecentRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('recent');
+  const [totalRides, setTotalRides] = useState(0);
 
   useEffect(() => {
     if (user) {
       fetchUserData();
       fetchRecentRides();
+      fetchTotalRides();
     }
   }, [user]);
 
@@ -51,16 +54,12 @@ export default function Profile() {
       if (userDoc.exists()) {
         setUserData(userDoc.data());
       } else {
-        // Create default user data if doesn't exist
         setUserData({
           displayName: user.displayName || 'User',
           email: user.email,
           verified: false,
-          totalRides: 0,
-          totalKm: 0,
-          totalHours: 0,
-          groups: 0,
-          rating: 5.0,
+          rating: null,
+          totalReviews: 0,
         });
       }
     } catch (error) {
@@ -70,20 +69,44 @@ export default function Profile() {
     }
   };
 
-  const fetchRecentRides = async () => {
-  try {
-    const ridesQuery = query(
-      collection(db, 'rides'),
-      where('participants', 'array-contains', user.uid),
-      limit(3)  
-    );
-      
-      const snapshot = await getDocs(ridesQuery);
-      const rides = [];
-      snapshot.forEach((doc) => {
-        rides.push({ id: doc.id, ...doc.data() });
+  // Count all rides the user has joined or created
+  const fetchTotalRides = async () => {
+    try {
+      const allRidesSnap = await getDocs(collection(db, 'rides'));
+      let count = 0;
+      allRidesSnap.forEach((d) => {
+        const ride = d.data();
+        const isCreator = ride.createdBy === user.uid;
+        const isParticipant = Array.isArray(ride.participants) &&
+          ride.participants.some(p =>
+            (typeof p === 'object' && p.userId === user.uid) || p === user.uid
+          );
+        if (isCreator || isParticipant) count++;
       });
-      setRecentRides(rides);
+      setTotalRides(count);
+    } catch (error) {
+      console.error('Error counting rides:', error);
+    }
+  };
+
+  // Fetch recent rides — handles both object and string participant formats
+  const fetchRecentRides = async () => {
+    try {
+      const allRidesSnap = await getDocs(collection(db, 'rides'));
+      const userRides = [];
+      allRidesSnap.forEach((d) => {
+        const ride = { id: d.id, ...d.data() };
+        const isCreator = ride.createdBy === user.uid;
+        const isParticipant = Array.isArray(ride.participants) &&
+          ride.participants.some(p =>
+            (typeof p === 'object' && p.userId === user.uid) || p === user.uid
+          );
+        if (isCreator || isParticipant) userRides.push(ride);
+      });
+
+      // Sort by date newest first and take last 3
+      userRides.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setRecentRides(userRides.slice(0, 3));
     } catch (error) {
       console.error('Error fetching recent rides:', error);
     }
@@ -116,15 +139,9 @@ export default function Profile() {
   }
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        bgcolor: '#f5f5f5',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {/* Purple Header with Profile Info */}
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Purple Header */}
       <Box
         sx={{
           background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
@@ -136,25 +153,16 @@ export default function Profile() {
           position: 'relative',
         }}
       >
-        {/* Settings & Logout Icons */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <IconButton
-            onClick={() => navigate('/dashboard')}
-            sx={{ color: 'white' }}
-          >
+          <IconButton onClick={() => navigate('/dashboard')} sx={{ color: 'white' }}>
             <ChevronRight sx={{ transform: 'rotate(180deg)' }} />
           </IconButton>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton sx={{ color: 'white' }}>
-              <Settings />
-            </IconButton>
-            <IconButton onClick={handleLogout} sx={{ color: 'white' }}>
-              <Logout />
-            </IconButton>
+            <IconButton sx={{ color: 'white' }}><Settings /></IconButton>
+            <IconButton onClick={handleLogout} sx={{ color: 'white' }}><Logout /></IconButton>
           </Box>
         </Box>
 
-        {/* Profile Photo */}
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Avatar
             sx={{
@@ -171,32 +179,32 @@ export default function Profile() {
           </Avatar>
         </Box>
 
-        {/* User Name */}
         <Typography variant="h5" sx={{ fontWeight: 700, textAlign: 'center', mb: 0.5 }}>
           {userData?.displayName || user?.displayName || 'User'}
         </Typography>
 
-        {/* Rating */}
+        {/* Real rating from Firestore */}
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
           <Star sx={{ fontSize: 18, color: '#fbbf24' }} />
           <Typography variant="body1" sx={{ fontWeight: 600 }}>
-            {userData?.rating || 5.0}
+            {userData?.rating ? userData.rating.toFixed(1) : 'No rating yet'}
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.9 }}>
-            • {userData?.totalRides || 0} rides
+            • {totalRides} rides
           </Typography>
         </Box>
 
-        {/* Verified Badge */}
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <Chip
             icon={<Shield sx={{ fontSize: 16, color: 'white' }} />}
-            label={userData?.verified ? "Verified Rider" : "Not Verified"}
+            label={userData?.verified ? 'Verified Rider' : 'Not Verified'}
             sx={{
               bgcolor: userData?.verified ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
               color: 'white',
               fontWeight: 600,
-              border: userData?.verified ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(239,68,68,0.4)',
+              border: userData?.verified
+                ? '1px solid rgba(34,197,94,0.4)'
+                : '1px solid rgba(239,68,68,0.4)',
             }}
           />
         </Box>
@@ -204,7 +212,8 @@ export default function Profile() {
 
       {/* Main Content */}
       <Container maxWidth="sm" sx={{ mt: -5, px: 2, pb: 10, flex: 1, position: 'relative', zIndex: 10 }}>
-        {/* Stats Cards - Elevated in front of purple */}
+
+        {/* Stats Cards — real data */}
         <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
           <Box
             sx={{
@@ -217,11 +226,9 @@ export default function Profile() {
             }}
           >
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {userData?.totalRides || 0}
+              {totalRides}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
-              Rides
-            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>Rides</Typography>
           </Box>
 
           <Box
@@ -235,11 +242,9 @@ export default function Profile() {
             }}
           >
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {userData?.totalKm || '0'}
+              {userData?.rating ? userData.rating.toFixed(1) : '—'}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
-              KM
-            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>Rating</Typography>
           </Box>
 
           <Box
@@ -253,11 +258,9 @@ export default function Profile() {
             }}
           >
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {userData?.totalHours || 0}
+              {userData?.totalReviews || 0}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
-              Hours
-            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>Reviews</Typography>
           </Box>
 
           <Box
@@ -271,11 +274,9 @@ export default function Profile() {
             }}
           >
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {userData?.groups || 0}
+              {userData?.role === 'organizer' || userData?.role === 'admin' ? '✓' : '—'}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
-              Groups
-            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>Organizer</Typography>
           </Box>
         </Box>
 
@@ -291,17 +292,7 @@ export default function Profile() {
           onClick={() => navigate('/become-organizer')}
         >
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 2,
-                bgcolor: '#f3e8ff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Shield sx={{ fontSize: 24, color: '#7c3aed' }} />
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -328,17 +319,7 @@ export default function Profile() {
           onClick={() => navigate('/emergency-contacts')}
         >
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 2,
-                bgcolor: '#fee2e2',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ContactEmergency sx={{ fontSize: 24, color: '#ef4444' }} />
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -418,11 +399,19 @@ export default function Profile() {
                       <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
                         {ride.title}
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star key={star} sx={{ fontSize: 16, color: '#fbbf24' }} />
-                        ))}
-                      </Box>
+                      <Chip
+                        label={ride.status || 'upcoming'}
+                        size="small"
+                        sx={{
+                          bgcolor: ride.status === 'completed' ? '#dcfce7'
+                            : ride.status === 'ongoing' ? '#fef3c7' : '#f3e8ff',
+                          color: ride.status === 'completed' ? '#059669'
+                            : ride.status === 'ongoing' ? '#d97706' : '#7c3aed',
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                          textTransform: 'capitalize',
+                        }}
+                      />
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                       <CalendarToday sx={{ fontSize: 14, color: '#94a3b8' }} />
@@ -433,7 +422,7 @@ export default function Profile() {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <LocationOn sx={{ fontSize: 14, color: '#94a3b8' }} />
                       <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                        {ride.createdByName}
+                        {ride.meetingPoint} → {ride.destination}
                       </Typography>
                     </Box>
                   </CardContent>
@@ -452,10 +441,64 @@ export default function Profile() {
 
         {/* Badges Content */}
         {activeTab === 'badges' && (
-          <Box sx={{ textAlign: 'center', py: 4, mb: 10 }}>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              No badges earned yet
-            </Typography>
+          <Box sx={{ mb: 8 }}>
+            {/* First Ride Badge */}
+            {totalRides >= 1 && (
+              <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
+                  <Box sx={{ width: 52, height: 52, borderRadius: '50%', bgcolor: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EmojiEvents sx={{ fontSize: 28, color: '#f59e0b' }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>First Ride</Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>Completed your first ride</Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 5 Rides Badge */}
+            {totalRides >= 5 && (
+              <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
+                  <Box sx={{ width: 52, height: 52, borderRadius: '50%', bgcolor: '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <EmojiEvents sx={{ fontSize: 28, color: '#7c3aed' }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>Regular Rider</Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>Completed 5 rides</Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Verified Badge */}
+            {userData?.verified && (
+              <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
+                  <Box sx={{ width: 52, height: 52, borderRadius: '50%', bgcolor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Shield sx={{ fontSize: 28, color: '#10b981' }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>Verified Organizer</Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>Approved as a trusted organizer</Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* No badges yet */}
+            {totalRides < 1 && !userData?.verified && (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <EmojiEvents sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
+                <Typography variant="body1" sx={{ fontWeight: 600, color: '#64748b', mb: 0.5 }}>
+                  No badges yet
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                  Complete rides to earn your first badge!
+                </Typography>
+              </Box>
+            )}
           </Box>
         )}
       </Container>
@@ -475,43 +518,21 @@ export default function Profile() {
       >
         <Container maxWidth="sm">
           <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-            <Box 
-              sx={{ textAlign: 'center', cursor: 'pointer' }} 
-              onClick={() => navigate('/dashboard')}
-            >
-              <IconButton sx={{ color: '#94a3b8' }}>
-                <HomeIcon />
-              </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
-                Home
-              </Typography>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
+              <IconButton sx={{ color: '#94a3b8' }}><HomeIcon /></IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>Home</Typography>
             </Box>
-            <Box 
-              sx={{ textAlign: 'center', cursor: 'pointer' }} 
-              onClick={() => navigate('/join-ride')}
-            >
-              <IconButton sx={{ color: '#94a3b8' }}>
-                <DirectionsBike />
-              </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
-                Rides
-              </Typography>
+            <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/join-ride')}>
+              <IconButton sx={{ color: '#94a3b8' }}><DirectionsBike /></IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>Rides</Typography>
             </Box>
             <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/chat')}>
-              <IconButton sx={{ color: '#94a3b8' }}>
-                <Message />
-              </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
-                Chat
-              </Typography>
+              <IconButton sx={{ color: '#94a3b8' }}><Message /></IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>Chat</Typography>
             </Box>
             <Box sx={{ textAlign: 'center' }}>
-              <IconButton sx={{ color: '#7c3aed' }}>
-                <Person />
-              </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#7c3aed', fontWeight: 600 }}>
-                Profile
-              </Typography>
+              <IconButton sx={{ color: '#7c3aed' }}><Person /></IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#7c3aed', fontWeight: 600 }}>Profile</Typography>
             </Box>
           </Box>
         </Container>

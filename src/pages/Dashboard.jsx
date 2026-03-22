@@ -46,40 +46,39 @@ export default function Dashboard() {
   const [ongoingRides, setOngoingRides] = useState([]);
   const [loadingRides, setLoadingRides] = useState(true);
 
-  // Listen for auth state changes
+  // Real stats
+  const [totalRides, setTotalRides] = useState(0);
+  const [userRating, setUserRating] = useState(null);
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Fetch user role on component mount
+  // Fetch ongoing rides + user stats when user is available
   useEffect(() => {
-  const fetchOngoingRides = async () => {
     if (!user) {
       setLoadingRides(false);
       return;
     }
+    fetchOngoingRides();
+    fetchUserStats();
+  }, [user]);
 
+  const fetchOngoingRides = async () => {
     try {
       setLoadingRides(true);
-      
-      // Query ALL ongoing rides (everyone can see them)
       const ridesQuery = query(
         collection(db, 'rides'),
         where('status', '==', 'ongoing')
       );
-
       const querySnapshot = await getDocs(ridesQuery);
       const ridesData = [];
-
       querySnapshot.forEach((doc) => {
-        const rideData = { id: doc.id, ...doc.data() };
-        ridesData.push(rideData);
+        ridesData.push({ id: doc.id, ...doc.data() });
       });
-
       setOngoingRides(ridesData);
     } catch (error) {
       console.error('Error fetching ongoing rides:', error);
@@ -88,8 +87,33 @@ export default function Dashboard() {
     }
   };
 
-  fetchOngoingRides();
-}, [user]);
+  const fetchUserStats = async () => {
+    try {
+      // 1. Get real ride count — count all rides where user is participant or creator
+      const allRidesSnap = await getDocs(collection(db, 'rides'));
+      let rideCount = 0;
+      allRidesSnap.forEach((d) => {
+        const ride = d.data();
+        const isCreator = ride.createdBy === user.uid;
+        const isParticipant = Array.isArray(ride.participants) &&
+          ride.participants.some(p =>
+            (typeof p === 'object' && p.userId === user.uid) || p === user.uid
+          );
+        if (isCreator || isParticipant) rideCount++;
+      });
+      setTotalRides(rideCount);
+
+      // 2. Get real rating from user's Firestore document
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setUserRole(data.role);
+        setUserRating(data.rating || null);
+      }
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -104,7 +128,6 @@ export default function Dashboard() {
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const role = userDoc.data()?.role;
-
       if (role === 'rider') {
         setShowVerificationDialog(true);
       } else if (role === 'organizer' || role === 'admin') {
@@ -113,11 +136,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error checking user role:', error);
     }
-  };
-
-  const handleSOSClick = (rideId) => {
-    // Navigate to SOS page or trigger SOS
-    navigate('/emergency-sos');
   };
 
   const formatTime = (timeString) => {
@@ -166,7 +184,6 @@ export default function Dashboard() {
         >
           {/* Profile + Notification Row */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            {/* Left: Profile */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Avatar
                 sx={{
@@ -188,7 +205,6 @@ export default function Dashboard() {
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>
                   {user?.displayName || 'Rider'}
                 </Typography>
-                {/* Show badge if organizer or admin */}
                 {(userRole === 'organizer' || userRole === 'admin') && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                     <VerifiedUser sx={{ fontSize: 16, color: '#22c55e' }} />
@@ -200,7 +216,6 @@ export default function Dashboard() {
               </Box>
             </Box>
 
-            {/* Right: Notification + Logout */}
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
               <IconButton
                 sx={{
@@ -213,7 +228,6 @@ export default function Dashboard() {
                   <Notifications />
                 </Badge>
               </IconButton>
-
               <IconButton
                 onClick={handleLogout}
                 sx={{
@@ -227,7 +241,7 @@ export default function Dashboard() {
             </Box>
           </Box>
 
-          {/* Stats Row with Purple Boxes */}
+          {/* Stats Row — now real data */}
           <Box sx={{ display: 'flex', justifyContent: 'space-around', gap: 2 }}>
             <Box
               sx={{
@@ -240,7 +254,7 @@ export default function Dashboard() {
               }}
             >
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                0
+                {totalRides}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
                 Rides
@@ -257,7 +271,7 @@ export default function Dashboard() {
               }}
             >
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                5.0
+                {userRating !== null ? userRating : '—'}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
                 Rating
@@ -287,7 +301,6 @@ export default function Dashboard() {
         <Box sx={{ p: 2, flex: 1 }}>
           {/* Create & Join Ride Cards */}
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            {/* Create Ride */}
             <Card
               sx={{
                 flex: 1,
@@ -323,7 +336,6 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Join Ride */}
             <Card
               sx={{
                 flex: 1,
@@ -456,23 +468,17 @@ export default function Dashboard() {
                 <Chip
                   label={`${ongoingRides.length} Active`}
                   size="small"
-                  sx={{
-                    bgcolor: '#dcfce7',
-                    color: '#059669',
-                    fontWeight: 600,
-                  }}
+                  sx={{ bgcolor: '#dcfce7', color: '#059669', fontWeight: 600 }}
                 />
               )}
             </Box>
 
-            {/* Loading State */}
             {loadingRides && (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress sx={{ color: '#7c3aed' }} />
               </Box>
             )}
 
-            {/* Empty State */}
             {!loadingRides && ongoingRides.length === 0 && (
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <DirectionsBike sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
@@ -485,7 +491,6 @@ export default function Dashboard() {
               </Box>
             )}
 
-            {/* Ongoing Rides List */}
             {!loadingRides && ongoingRides.length > 0 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {ongoingRides.map((ride) => (
@@ -498,7 +503,6 @@ export default function Dashboard() {
                     }}
                   >
                     <CardContent sx={{ p: 2.5 }}>
-                      {/* Ride Title and Status */}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                         <Box>
                           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
@@ -525,7 +529,6 @@ export default function Dashboard() {
                         />
                       </Box>
 
-                      {/* Date, Time, Participants */}
                       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <CalendarToday sx={{ fontSize: 14, color: '#7c3aed' }} />
@@ -547,91 +550,83 @@ export default function Dashboard() {
                         </Box>
                       </Box>
 
-                      {/* Action Buttons */}
-                     {/* Action Buttons */}
-<Box sx={{ display: 'flex', gap: 1.5 }}>
-  <Button
-    fullWidth
-    variant="outlined"
-    onClick={() => navigate(`/ride-details/${ride.id}`)}
-    sx={{
-      color: '#7c3aed',
-      borderColor: '#7c3aed',
-      py: 1.2,
-      fontSize: '0.9rem',
-      fontWeight: 600,
-      textTransform: 'none',
-      borderRadius: 3,
-      borderWidth: 2,
-      '&:hover': {
-        borderColor: '#6d28d9',
-        bgcolor: 'transparent',
-        borderWidth: 2,
-      },
-    }}
-  >
-    View Details
-  </Button>
-  
-  {/* Check if user is participant or creator */}
-  {(() => {
-    const isCreator = ride.createdBy === user.uid;
-    const isParticipant = Array.isArray(ride.participants) && 
-                         ride.participants.some(p => 
-                           (typeof p === 'object' && p.userId === user.uid) || 
-                           p === user.uid
-                         );
-    
-    const canUseSOS = isCreator || isParticipant;
-    
-    return canUseSOS ? (
-      <Button
-        variant="contained"
-        startIcon={<Warning />}
-        onClick={() => navigate(`/emergency-sos/${ride.id}`)}
-        sx={{
-          bgcolor: '#ef4444',
-          color: 'white',
-          py: 1.2,
-          px: 2.5,
-          fontSize: '0.9rem',
-          fontWeight: 700,
-          textTransform: 'none',
-          borderRadius: 3,
-          boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
-          '&:hover': {
-            bgcolor: '#dc2626',
-            boxShadow: '0 6px 16px rgba(239,68,68,0.4)',
-          },
-        }}
-      >
-        SOS
-      </Button>
-    ) : (
-      <Button
-        variant="contained"
-        disabled
-        startIcon={<Warning />}
-        sx={{
-          bgcolor: '#cbd5e1',
-          color: '#64748b',
-          py: 1.2,
-          px: 2.5,
-          fontSize: '0.9rem',
-          fontWeight: 700,
-          textTransform: 'none',
-          borderRadius: 3,
-          '&:disabled': {
-            bgcolor: '#cbd5e1',
-            color: '#64748b',
-          },
-        }}
-      >
-        SOS
-      </Button>
-    );
-  })()}
-</Box>
+                      <Box sx={{ display: 'flex', gap: 1.5 }}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={() => navigate(`/ride-details/${ride.id}`)}
+                          sx={{
+                            color: '#7c3aed',
+                            borderColor: '#7c3aed',
+                            py: 1.2,
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            borderRadius: 3,
+                            borderWidth: 2,
+                            '&:hover': {
+                              borderColor: '#6d28d9',
+                              bgcolor: 'transparent',
+                              borderWidth: 2,
+                            },
+                          }}
+                        >
+                          View Details
+                        </Button>
+
+                        {(() => {
+                          const isCreator = ride.createdBy === user?.uid;
+                          const isParticipant = Array.isArray(ride.participants) &&
+                            ride.participants.some(p =>
+                              (typeof p === 'object' && p.userId === user?.uid) || p === user?.uid
+                            );
+                          const canUseSOS = isCreator || isParticipant;
+
+                          return canUseSOS ? (
+                            <Button
+                              variant="contained"
+                              startIcon={<Warning />}
+                              onClick={() => navigate(`/emergency-sos/${ride.id}`)}
+                              sx={{
+                                bgcolor: '#ef4444',
+                                color: 'white',
+                                py: 1.2,
+                                px: 2.5,
+                                fontSize: '0.9rem',
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                borderRadius: 3,
+                                boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
+                                '&:hover': {
+                                  bgcolor: '#dc2626',
+                                  boxShadow: '0 6px 16px rgba(239,68,68,0.4)',
+                                },
+                              }}
+                            >
+                              SOS
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="contained"
+                              disabled
+                              startIcon={<Warning />}
+                              sx={{
+                                bgcolor: '#cbd5e1',
+                                color: '#64748b',
+                                py: 1.2,
+                                px: 2.5,
+                                fontSize: '0.9rem',
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                borderRadius: 3,
+                                '&:disabled': { bgcolor: '#cbd5e1', color: '#64748b' },
+                              }}
+                            >
+                              SOS
+                            </Button>
+                          );
+                        })()}
+                      </Box>
                     </CardContent>
                   </Card>
                 ))}
@@ -642,48 +637,26 @@ export default function Dashboard() {
       </Container>
 
       {/* Bottom Navigation */}
-      <Box
-        sx={{
-          bgcolor: 'white',
-          borderTop: '1px solid #e5e7eb',
-          py: 1.5,
-        }}
-      >
+      <Box sx={{ bgcolor: 'white', borderTop: '1px solid #e5e7eb', py: 1.5 }}>
         <Container maxWidth="sm">
           <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
             <Box sx={{ textAlign: 'center' }}>
-              <IconButton sx={{ color: '#7c3aed' }}>
-                <HomeIcon />
-              </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#7c3aed', fontWeight: 600 }}>
-                Home
-              </Typography>
+              <IconButton sx={{ color: '#7c3aed' }}><HomeIcon /></IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#7c3aed', fontWeight: 600 }}>Home</Typography>
             </Box>
             <Box sx={{ textAlign: 'center' }} onClick={() => navigate('/join-ride')}>
-              <IconButton sx={{ color: '#94a3b8' }}>
-                <DirectionsBike />
-              </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
-                Rides
-              </Typography>
+              <IconButton sx={{ color: '#94a3b8' }}><DirectionsBike /></IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>Rides</Typography>
             </Box>
             <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/chat')}>
               <IconButton sx={{ color: '#94a3b8' }}>
-                <Badge badgeContent={2} color="error">
-                  <Message />
-                </Badge>
+                <Badge badgeContent={2} color="error"><Message /></Badge>
               </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
-                Chat
-              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>Chat</Typography>
             </Box>
             <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/profile')}>
-              <IconButton sx={{ color: '#94a3b8' }}>
-                <Person />
-              </IconButton>
-              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>
-                Profile
-              </Typography>
+              <IconButton sx={{ color: '#94a3b8' }}><Person /></IconButton>
+              <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>Profile</Typography>
             </Box>
           </Box>
         </Container>
@@ -693,14 +666,7 @@ export default function Dashboard() {
       <Dialog
         open={showVerificationDialog}
         onClose={() => setShowVerificationDialog(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            px: 2,
-            py: 1,
-            maxWidth: '400px',
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '400px' } }}
       >
         <DialogTitle sx={{ textAlign: 'center', pt: 3 }}>
           <Box
@@ -733,30 +699,14 @@ export default function Dashboard() {
         <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
           <Button
             onClick={() => setShowVerificationDialog(false)}
-            sx={{
-              color: '#64748b',
-              textTransform: 'none',
-              fontWeight: 600,
-            }}
+            sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}
           >
             Cancel
           </Button>
           <Button
             variant="contained"
-            onClick={() => {
-              setShowVerificationDialog(false);
-              navigate('/become-organizer');
-            }}
-            sx={{
-              bgcolor: '#7c3aed',
-              px: 3,
-              py: 1.5,
-              textTransform: 'none',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: '#6d28d9',
-              },
-            }}
+            onClick={() => { setShowVerificationDialog(false); navigate('/become-organizer'); }}
+            sx={{ bgcolor: '#7c3aed', px: 3, py: 1.5, textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#6d28d9' } }}
           >
             Request Organizer Role
           </Button>
