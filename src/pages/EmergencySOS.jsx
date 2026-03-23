@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { sendNotification } from '../services/notifications';
 import {
   Box,
   Container,
@@ -207,6 +208,19 @@ export default function EmergencySOS() {
   const handleSOSActivate = () => {
     setSOSActive(true);
     startContinuousBeep();
+    if (participants.length > 0) {
+    participants.forEach(async (participant) => {
+      if (participant.id !== user?.uid) {
+        await sendNotification(
+          participant.id,
+          'sos_alert',
+          '🚨 SOS Alert!',
+          `${user?.displayName || 'A rider'} triggered an emergency SOS on "${activeRide?.title}"`,
+          activeRide?.id
+        );
+      }
+    });
+  }
     
     if (participants.length > 0) {
       setShowParticipantsDialog(true);
@@ -226,6 +240,19 @@ export default function EmergencySOS() {
   };
 
   const handleStopSOS = () => {
+    if (participants.length > 0) {
+    participants.forEach(async (participant) => {
+      if (participant.id !== user?.uid) {
+        await sendNotification(
+          participant.id,
+          'sos_resolved',
+          '✅ SOS Resolved',
+          `${user?.displayName || 'A rider'} is safe. SOS has been resolved on "${activeRide?.title}"`,
+          activeRide?.id
+        );
+      }
+    });
+  }
     setSOSActive(false);
     setShowParticipantsDialog(false);
     stopContinuousBeep();

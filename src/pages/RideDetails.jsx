@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import RouteMapViewer from '../components/RouteMapViewer';
+import { sendNotification } from '../services/notifications';
 import {
   Box,
   Container,
@@ -111,6 +112,28 @@ export default function RideDetails() {
       if (alreadyJoined) { alert('You have already joined this ride'); setActionLoading(false); return; }
       await updateDoc(rideRef, { participants: [...currentParticipants, participantData] });
       await fetchRideDetails();
+      // Notify organizer
+await sendNotification(
+  currentRide.createdBy,
+  'ride_joined',
+  '👤 New Participant',
+  `${user.displayName || 'Someone'} joined your ride "${currentRide.title}"`,
+  rideId
+);
+
+// Notify all other existing participants
+for (const p of currentParticipants) {
+  const participantId = typeof p === 'object' ? p.userId : p;
+  if (participantId && participantId !== user.uid && participantId !== currentRide.createdBy) {
+    await sendNotification(
+      participantId,
+      'ride_joined',
+      '👤 Rider Joined',
+      `${user.displayName || 'Someone'} also joined "${currentRide.title}"`,
+      rideId
+    );
+  }
+}
       setShowJoinSuccessDialog(true);
     } catch (error) {
       console.error('Error joining ride:', error);
@@ -127,6 +150,28 @@ export default function RideDetails() {
       const updatedParticipants = ride.participants.filter(p => p.userId !== user.uid);
       await updateDoc(doc(db, 'rides', rideId), { participants: updatedParticipants });
       await fetchRideDetails();
+      // Notify organizer
+await sendNotification(
+  ride.createdBy,
+  'ride_left',
+  '👋 Participant Left',
+  `${user.displayName || 'Someone'} left your ride "${ride.title}"`,
+  rideId
+);
+
+// Notify remaining participants
+for (const p of updatedParticipants) {
+  const participantId = typeof p === 'object' ? p.userId : p;
+  if (participantId && participantId !== user.uid && participantId !== ride.createdBy) {
+    await sendNotification(
+      participantId,
+      'ride_left',
+      '👋 Rider Left',
+      `${user.displayName || 'Someone'} left "${ride.title}"`,
+      rideId
+    );
+  }
+}
     } catch (error) {
       console.error('Error leaving ride:', error);
       alert('Failed to leave ride. Please try again.');
@@ -141,6 +186,19 @@ export default function RideDetails() {
     try {
       await updateDoc(doc(db, 'rides', rideId), { status: 'ongoing', startedAt: new Date() });
       await fetchRideDetails();
+      // Notify all participants
+for (const p of ride.participants) {
+  const participantId = typeof p === 'object' ? p.userId : p;
+  if (participantId && participantId !== user.uid) {
+    await sendNotification(
+      participantId,
+      'ride_started',
+      '🏍️ Ride Started!',
+      `"${ride.title}" has started. Get ready to ride!`,
+      rideId
+    );
+  }
+}
     } catch (error) {
       console.error('Error starting ride:', error);
       alert('Failed to start ride. Please try again.');
@@ -155,6 +213,19 @@ export default function RideDetails() {
     try {
       await updateDoc(doc(db, 'rides', rideId), { status: 'completed', completedAt: new Date() });
       await fetchRideDetails();
+      // Notify all participants
+for (const p of ride.participants) {
+  const participantId = typeof p === 'object' ? p.userId : p;
+  if (participantId && participantId !== user.uid) {
+    await sendNotification(
+      participantId,
+      'ride_completed',
+      '✅ Ride Completed',
+      `"${ride.title}" has been completed. Rate your experience!`,
+      rideId
+    );
+  }
+}
     } catch (error) {
       console.error('Error completing ride:', error);
       alert('Failed to complete ride. Please try again.');
@@ -167,6 +238,20 @@ export default function RideDetails() {
     setShowCancelConfirmDialog(false);
     setActionLoading(true);
     try {
+      const rideSnap = await getDoc(doc(db, 'rides', rideId));
+const rideToCancel = rideSnap.data();
+for (const p of rideToCancel.participants || []) {
+  const participantId = typeof p === 'object' ? p.userId : p;
+  if (participantId && participantId !== user.uid) {
+    await sendNotification(
+      participantId,
+      'ride_cancelled',
+      '❌ Ride Cancelled',
+      `"${rideToCancel.title}" has been cancelled by the organizer`,
+      rideId
+    );
+  }
+}
       await deleteDoc(doc(db, 'rides', rideId));
       alert('Ride cancelled and deleted successfully!');
       navigate('/dashboard');

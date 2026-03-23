@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
+import { sendNotification } from '../services/notifications';
 import {
   Box,
   Container,
@@ -135,6 +136,13 @@ export default function AdminDashboard() {
         role: 'organizer',
         verified: true,
       });
+      await sendNotification(
+      selectedRequest.userId,
+      'verification_approved',
+      '✅ Verification Approved!',
+      'Congratulations! Your organizer verification has been approved. You can now create rides.',
+      null
+    );
 
       console.log('Request approved successfully');
       await fetchDashboardData();
@@ -158,6 +166,13 @@ export default function AdminDashboard() {
         status: 'rejected',
         rejectedAt: new Date(),
       });
+      await sendNotification(
+      selectedRequest.userId,
+      'verification_rejected',
+      '❌ Verification Rejected',
+      'Your organizer verification request was rejected. You can reapply with updated documents.',
+      null
+    );
 
       console.log('Request rejected successfully');
       await fetchDashboardData();
