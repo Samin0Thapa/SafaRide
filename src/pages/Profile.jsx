@@ -492,7 +492,7 @@ export default function Profile() {
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <EmojiEvents sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
                 <Typography variant="body1" sx={{ fontWeight: 600, color: '#64748b', mb: 0.5 }}>
-                  No badges yet
+                  No badges earned yet.
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                   Complete rides to earn your first badge!
