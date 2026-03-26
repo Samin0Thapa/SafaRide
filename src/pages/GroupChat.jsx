@@ -133,21 +133,40 @@ export default function GroupChat() {
   };
 
   const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    
-    try {
-      const date = timestamp.toDate();
-      const hours = date.getHours();
-      const minutes = date.getMinutes();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const displayHours = hours % 12 || 12;
-      const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
-      
-      return `${displayHours}:${displayMinutes} ${ampm}`;
-    } catch (e) {
-      return '';
-    }
-  };
+  if (!timestamp) return '';
+
+  try {
+    const date = timestamp.toDate();
+    const now = new Date();
+
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    const timeStr = `${displayHours}:${displayMinutes} ${ampm}`;
+
+    // Check if message is from today
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    // Check if message is from yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    if (isToday) return timeStr;
+    if (isYesterday) return `Yesterday ${timeStr}`;
+    return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${timeStr}`;
+  } catch (e) {
+    return '';
+  }
+};
 
   if (loading) {
     return (
