@@ -119,7 +119,12 @@ export default function CreateRide() {
         createdBy: user.uid,
         createdByName: user.displayName || 'Anonymous',
         createdByEmail: user.email,
-        participants: [user.uid],
+        participants: [{
+          userId: user.uid,
+          name: user.displayName || 'Anonymous',
+          email: user.email,
+          joinedAt: new Date(),
+        }],
         status: 'upcoming',
         createdAt: serverTimestamp(),
         maxParticipants: 10,
