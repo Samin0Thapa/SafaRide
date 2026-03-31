@@ -1,18 +1,12 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-google-maps/api';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-  Typography,
-  CircularProgress,
-  ToggleButtonGroup,
-  ToggleButton,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, Box, Typography, CircularProgress,
+  ToggleButtonGroup, ToggleButton, TextField,
+  InputAdornment, List, ListItem, ListItemText, Paper,
 } from '@mui/material';
-import { LocationOn, MyLocation } from '@mui/icons-material';
+import { LocationOn, MyLocation, Search } from '@mui/icons-material';
 
 const containerStyle = {
   width: '100%',
@@ -20,11 +14,7 @@ const containerStyle = {
   borderRadius: '12px',
 };
 
-const defaultCenter = {
-  lat: 27.7172,
-  lng: 85.3240,
-};
-
+const defaultCenter = { lat: 27.7172, lng: 85.3240 };
 const LIBRARIES = ['places'];
 
 export default function MapPicker({ open, onClose, onSave, initialMeetingPoint, initialDestination }) {
@@ -39,75 +29,21 @@ export default function MapPicker({ open, onClose, onSave, initialMeetingPoint, 
   const [meetingPoint, setMeetingPoint] = useState(initialMeetingPoint);
   const [destination, setDestination] = useState(initialDestination);
   const [directions, setDirections] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
 
-  const searchContainerRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  const onLoad = useCallback((map) => setMap(map), []);
+  const onLoad = useCallback((m) => setMap(m), []);
   const onUnmount = useCallback(() => setMap(null), []);
 
-  // Setup PlaceAutocompleteElement
   useEffect(() => {
-    if (!isLoaded || !searchContainerRef.current || !open) return;
+    setSearchText('');
+    setSuggestions([]);
+    setShowDropdown(false);
+  }, [selectingFor]);
 
-    searchContainerRef.current.innerHTML = '';
-
-    try {
-      const placeAutocomplete = new window.google.maps.places.PlaceAutocompleteElement({
-        componentRestrictions: { country: 'np' },
-      });
-
-      Object.assign(placeAutocomplete.style, {
-        width: '100%',
-        display: 'block',
-        marginBottom: '12px',
-        height: '44px',
-        borderRadius: '8px',
-        fontSize: '14px',
-      });
-
-      searchContainerRef.current.appendChild(placeAutocomplete);
-
-      const handlePlaceSelect = async (event) => {
-        try {
-          const place = event.place;
-          await place.fetchFields({
-            fields: ['displayName', 'formattedAddress', 'location'],
-          });
-
-          const locationData = {
-            address: place.displayName || place.formattedAddress.split(',')[0].trim(),
-            fullAddress: place.formattedAddress,
-            lat: place.location.lat(),
-            lng: place.location.lng(),
-          };
-
-          if (selectingFor === 'meetingPoint') {
-            setMeetingPoint(locationData);
-          } else {
-            setDestination(locationData);
-          }
-
-          map?.panTo({ lat: locationData.lat, lng: locationData.lng });
-          map?.setZoom(15);
-        } catch (err) {
-          console.error('Error fetching place details:', err);
-        }
-      };
-
-      placeAutocomplete.addEventListener('gmp-placeselect', handlePlaceSelect);
-
-      return () => {
-        placeAutocomplete.removeEventListener('gmp-placeselect', handlePlaceSelect);
-        if (searchContainerRef.current) {
-          searchContainerRef.current.innerHTML = '';
-        }
-      };
-    } catch (err) {
-      console.error('PlaceAutocompleteElement error:', err);
-    }
-  }, [isLoaded, open, selectingFor, map]);
-
-  // Calculate route
   useEffect(() => {
     if (meetingPoint && destination && window.google) {
       const directionsService = new window.google.maps.DirectionsService();
@@ -117,14 +53,63 @@ export default function MapPicker({ open, onClose, onSave, initialMeetingPoint, 
           destination: { lat: destination.lat, lng: destination.lng },
           travelMode: window.google.maps.TravelMode.DRIVING,
         },
-        (result, status) => {
-          setDirections(status === 'OK' ? result : null);
-        }
+        (result, status) => setDirections(status === 'OK' ? result : null)
       );
     } else {
       setDirections(null);
     }
   }, [meetingPoint, destination]);
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchText(value);
+
+    if (!value.trim()) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const { AutocompleteSuggestion } = await window.google.maps.importLibrary('places');
+        const result = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: value,
+        });
+        setSuggestions(result.suggestions || []);
+        setShowDropdown(true);
+      } catch (err) {
+        console.error('Autocomplete error:', err);
+      }
+    }, 300);
+  };
+
+  const handleSuggestionClick = async (suggestion) => {
+    try {
+      const place = suggestion.placePrediction.toPlace();
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+
+      const locationData = {
+        address: place.displayName || place.formattedAddress.split(',')[0].trim(),
+        fullAddress: place.formattedAddress,
+        lat: place.location.lat(),
+        lng: place.location.lng(),
+      };
+
+      if (selectingFor === 'meetingPoint') setMeetingPoint(locationData);
+      else setDestination(locationData);
+
+      map?.panTo({ lat: locationData.lat, lng: locationData.lng });
+      map?.setZoom(15);
+
+      setSearchText(locationData.address);
+      setSuggestions([]);
+      setShowDropdown(false);
+    } catch (err) {
+      console.error('Place fetch error:', err);
+    }
+  };
 
   const getShortAddress = (fullAddress) => fullAddress.split(',')[0].trim();
 
@@ -146,13 +131,10 @@ export default function MapPicker({ open, onClose, onSave, initialMeetingPoint, 
   }, [selectingFor]);
 
   const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) return alert('Geolocation not supported by your browser');
+    if (!navigator.geolocation) return alert('Geolocation not supported');
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
+        const location = { lat: position.coords.latitude, lng: position.coords.longitude };
         map?.panTo(location);
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location }, (results, status) => {
@@ -192,9 +174,7 @@ export default function MapPicker({ open, onClose, onSave, initialMeetingPoint, 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ pb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          Pick Locations on Map
-        </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>Pick Locations on Map</Typography>
         <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
           Search or click on the map to select locations
         </Typography>
@@ -230,16 +210,88 @@ export default function MapPicker({ open, onClose, onSave, initialMeetingPoint, 
           </Button>
         </Box>
 
-        {/* Search bar container */}
-        <Box
-          ref={searchContainerRef}
-          sx={{ mb: 1, width: '100%', '& > *': { width: '100% !important' } }}
-        />
+        {/* Search bar with dropdown */}
+        <Box sx={{ position: 'relative', mb: 2, zIndex: 1300 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder={selectingFor === 'meetingPoint' ? 'Search meeting point...' : 'Search destination...'}
+            value={searchText}
+            onChange={handleSearchChange}
+            onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: selectingFor === 'meetingPoint' ? '#22c55e' : '#ef4444', fontSize: 20 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              bgcolor: 'white',
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                bgcolor: 'white',
+                '&.Mui-focused fieldset': {
+                  borderColor: selectingFor === 'meetingPoint' ? '#22c55e' : '#ef4444',
+                },
+              },
+            }}
+          />
 
-        {/* Hint */}
-        <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 1.5 }}>
-          {selectingFor === 'meetingPoint' ? '📍 Searching for Meeting Point' : '🏁 Searching for Destination'}
-        </Typography>
+          {/* Dropdown */}
+          {showDropdown && suggestions.length > 0 && (
+            <Paper
+              elevation={6}
+              sx={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                zIndex: 1400,
+                maxHeight: '220px',
+                overflowY: 'auto',
+                borderRadius: 2,
+                mt: 0.5,
+                border: '1px solid #e2e8f0',
+              }}
+            >
+              <List dense disablePadding>
+                {suggestions.map((suggestion, index) => {
+                  const pred = suggestion.placePrediction;
+                  return (
+                    <ListItem
+                      key={index}
+                      onMouseDown={() => handleSuggestionClick(suggestion)}
+                      sx={{
+                        py: 1,
+                        px: 2,
+                        cursor: 'pointer',
+                        borderBottom: index < suggestions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        '&:hover': { bgcolor: '#f8f5ff' },
+                      }}
+                    >
+                      <LocationOn
+                        sx={{
+                          fontSize: 18,
+                          color: selectingFor === 'meetingPoint' ? '#22c55e' : '#ef4444',
+                          mr: 1,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <ListItemText
+                        primary={pred.mainText?.toString() || ''}
+                        secondary={pred.secondaryText?.toString() || ''}
+                        primaryTypographyProps={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}
+                        secondaryTypographyProps={{ fontSize: '12px', color: '#94a3b8' }}
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Paper>
+          )}
+        </Box>
 
         {/* Map */}
         <GoogleMap
