@@ -77,7 +77,10 @@ export default function MapPicker({ open, onClose, onSave, initialMeetingPoint, 
         const result = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
           input: value,
         });
-        setSuggestions(result.suggestions || []);
+        const filtered = (result.suggestions || []).filter(s => 
+          s.placePrediction?.secondaryText?.toString().includes('Nepal')
+        );
+setSuggestions(filtered);
         setShowDropdown(true);
       } catch (err) {
         console.error('Autocomplete error:', err);
