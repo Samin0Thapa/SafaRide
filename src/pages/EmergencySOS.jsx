@@ -836,11 +836,11 @@ const playBeep = () => {
                     fontWeight: 700,
                   }}
                 >
-                  {participant.displayName?.charAt(0)?.toUpperCase() || 'U'}
+                  {(participant.name || participant.displayName)?.charAt(0)?.toUpperCase() || 'U'}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                    {participant.displayName || 'Unknown User'}
+                    {participant.name || participant.displayName || 'Unknown User'}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                     {participant.email}
@@ -896,7 +896,7 @@ const playBeep = () => {
             </IconButton>
           </Box>
           <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-            {selectedParticipant?.displayName || 'User'}
+            {selectedParticipant?.name || selectedParticipant?.displayName || 'User'}
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ px: 3, pb: 3 }}>
