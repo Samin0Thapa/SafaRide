@@ -19,6 +19,7 @@ import EmergencySOS from "./pages/EmergencySOS";
 import ChatList from './pages/ChatList';
 import GroupChat from './pages/GroupChat';
 import RateRide from './pages/RateRide';
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
           <Route path="/chat" element={<ChatList />} />
           <Route path="/chat/:rideId" element={<GroupChat />} />
           <Route path="/rate-ride/:rideId" element={<RateRide />} />
+          <Route path="/settings" element={<Settings />} />
 
           
           {/* ADMIN ROUTE */}

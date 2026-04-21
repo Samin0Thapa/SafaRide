@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import {
   Box,
   Container,
@@ -69,7 +69,6 @@ export default function Profile() {
     }
   };
 
-  // Count all rides the user has joined or created
   const fetchTotalRides = async () => {
     try {
       const allRidesSnap = await getDocs(collection(db, 'rides'));
@@ -89,7 +88,6 @@ export default function Profile() {
     }
   };
 
-  // Fetch recent rides — handles both object and string participant formats
   const fetchRecentRides = async () => {
     try {
       const allRidesSnap = await getDocs(collection(db, 'rides'));
@@ -103,8 +101,6 @@ export default function Profile() {
           );
         if (isCreator || isParticipant) userRides.push(ride);
       });
-
-      // Sort by date newest first and take last 3
       userRides.sort((a, b) => new Date(b.date) - new Date(a.date));
       setRecentRides(userRides.slice(0, 3));
     } catch (error) {
@@ -146,9 +142,7 @@ export default function Profile() {
         sx={{
           background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
           borderRadius: '0 0 30px 30px',
-          px: 3,
-          pt: 3,
-          pb: 8,
+          px: 3, pt: 3, pb: 8,
           color: 'white',
           position: 'relative',
         }}
@@ -158,16 +152,20 @@ export default function Profile() {
             <ChevronRight sx={{ transform: 'rotate(180deg)' }} />
           </IconButton>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton sx={{ color: 'white' }}><Settings /></IconButton>
-            <IconButton onClick={handleLogout} sx={{ color: 'white' }}><Logout /></IconButton>
+            {/* Settings icon now navigates to /settings */}
+            <IconButton onClick={() => navigate('/settings')} sx={{ color: 'white' }}>
+              <Settings />
+            </IconButton>
+            <IconButton onClick={handleLogout} sx={{ color: 'white' }}>
+              <Logout />
+            </IconButton>
           </Box>
         </Box>
 
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Avatar
             sx={{
-              width: 100,
-              height: 100,
+              width: 100, height: 100,
               border: '4px solid white',
               bgcolor: '#fff',
               color: '#7c3aed',
@@ -180,10 +178,9 @@ export default function Profile() {
         </Box>
 
         <Typography variant="h5" sx={{ fontWeight: 700, textAlign: 'center', mb: 0.5 }}>
-          {userData?.displayName || user?.displayName || 'User'}
+          {userData?.name || userData?.displayName || user?.displayName || 'User'}
         </Typography>
 
-        {/* Real rating from Firestore */}
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
           <Star sx={{ fontSize: 18, color: '#fbbf24' }} />
           <Typography variant="body1" sx={{ fontWeight: 600 }}>
@@ -202,9 +199,7 @@ export default function Profile() {
               bgcolor: userData?.verified ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
               color: 'white',
               fontWeight: 600,
-              border: userData?.verified
-                ? '1px solid rgba(34,197,94,0.4)'
-                : '1px solid rgba(239,68,68,0.4)',
+              border: userData?.verified ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(239,68,68,0.4)',
             }}
           />
         </Box>
@@ -213,236 +208,110 @@ export default function Profile() {
       {/* Main Content */}
       <Container maxWidth="sm" sx={{ mt: -5, px: 2, pb: 10, flex: 1, position: 'relative', zIndex: 10 }}>
 
-        {/* Stats Cards — real data */}
+        {/* Stats Cards */}
         <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
-          <Box
-            sx={{
-              flex: 1,
-              bgcolor: 'white',
-              borderRadius: 3,
-              p: 2,
-              textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            }}
-          >
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {totalRides}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>Rides</Typography>
-          </Box>
-
-          <Box
-            sx={{
-              flex: 1,
-              bgcolor: 'white',
-              borderRadius: 3,
-              p: 2,
-              textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            }}
-          >
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {userData?.rating ? userData.rating.toFixed(1) : '—'}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>Rating</Typography>
-          </Box>
-
-          <Box
-            sx={{
-              flex: 1,
-              bgcolor: 'white',
-              borderRadius: 3,
-              p: 2,
-              textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            }}
-          >
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {userData?.totalReviews || 0}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>Reviews</Typography>
-          </Box>
-
-          <Box
-            sx={{
-              flex: 1,
-              bgcolor: 'white',
-              borderRadius: 3,
-              p: 2,
-              textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            }}
-          >
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-              {userData?.role === 'organizer' || userData?.role === 'admin' ? '✓' : '—'}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>Organizer</Typography>
-          </Box>
+          {[
+            { value: totalRides, label: 'Rides' },
+            { value: userData?.rating ? userData.rating.toFixed(1) : '—', label: 'Rating' },
+            { value: userData?.totalReviews || 0, label: 'Reviews' },
+            { value: userData?.role === 'organizer' || userData?.role === 'admin' ? '✓' : '—', label: 'Organizer' },
+          ].map((stat) => (
+            <Box key={stat.label} sx={{ flex: 1, bgcolor: 'white', borderRadius: 3, p: 2, textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>{stat.value}</Typography>
+              <Typography variant="caption" sx={{ color: '#64748b' }}>{stat.label}</Typography>
+            </Box>
+          ))}
         </Box>
 
         {/* Trust & Verification Card */}
-        <Card
-          sx={{
-            mb: 2,
-            borderRadius: 3,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            cursor: 'pointer',
-            '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' },
-          }}
-          onClick={() => navigate('/become-organizer')}
-        >
+        <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', cursor: 'pointer', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' } }} onClick={() => navigate('/become-organizer')}>
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Shield sx={{ fontSize: 24, color: '#7c3aed' }} />
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                Trust & Verification
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                View trust score and request organizer role
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>Trust & Verification</Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>View trust score and request organizer role</Typography>
             </Box>
             <ChevronRight sx={{ color: '#cbd5e1' }} />
           </CardContent>
         </Card>
 
         {/* Emergency Contacts Card */}
-        <Card
-          sx={{
-            mb: 2,
-            borderRadius: 3,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            cursor: 'pointer',
-            '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' },
-          }}
-          onClick={() => navigate('/emergency-contacts')}
-        >
+        <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', cursor: 'pointer', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' } }} onClick={() => navigate('/emergency-contacts')}>
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ContactEmergency sx={{ fontSize: 24, color: '#ef4444' }} />
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                Emergency Contacts
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                Manage your emergency contact list
-              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>Emergency Contacts</Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>Manage your emergency contact list</Typography>
             </Box>
             <ChevronRight sx={{ color: '#cbd5e1' }} />
           </CardContent>
         </Card>
 
-        {/* Tab Selection */}
+        {/* Tabs */}
         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-          <Button
-            variant={activeTab === 'recent' ? 'contained' : 'outlined'}
-            onClick={() => setActiveTab('recent')}
-            sx={{
-              flex: 1,
-              bgcolor: activeTab === 'recent' ? '#7c3aed' : 'transparent',
-              color: activeTab === 'recent' ? 'white' : '#7c3aed',
-              borderColor: '#7c3aed',
-              py: 1.5,
-              borderRadius: 5,
-              textTransform: 'none',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: activeTab === 'recent' ? '#6d28d9' : 'rgba(124,58,237,0.05)',
+          {['recent', 'badges'].map((tab) => (
+            <Button
+              key={tab}
+              variant={activeTab === tab ? 'contained' : 'outlined'}
+              onClick={() => setActiveTab(tab)}
+              sx={{
+                flex: 1,
+                bgcolor: activeTab === tab ? '#7c3aed' : 'transparent',
+                color: activeTab === tab ? 'white' : '#7c3aed',
                 borderColor: '#7c3aed',
-              },
-            }}
-          >
-            Recent Rides
-          </Button>
-          <Button
-            variant={activeTab === 'badges' ? 'contained' : 'outlined'}
-            onClick={() => setActiveTab('badges')}
-            sx={{
-              flex: 1,
-              bgcolor: activeTab === 'badges' ? '#7c3aed' : 'transparent',
-              color: activeTab === 'badges' ? 'white' : '#7c3aed',
-              borderColor: '#7c3aed',
-              py: 1.5,
-              borderRadius: 5,
-              textTransform: 'none',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: activeTab === 'badges' ? '#6d28d9' : 'rgba(124,58,237,0.05)',
-                borderColor: '#7c3aed',
-              },
-            }}
-          >
-            Badges
-          </Button>
+                py: 1.5, borderRadius: 5,
+                textTransform: 'none', fontWeight: 600,
+                '&:hover': { bgcolor: activeTab === tab ? '#6d28d9' : 'rgba(124,58,237,0.05)', borderColor: '#7c3aed' },
+              }}
+            >
+              {tab === 'recent' ? 'Recent Rides' : 'Badges'}
+            </Button>
+          ))}
         </Box>
 
-        {/* Recent Rides Content */}
+        {/* Recent Rides */}
         {activeTab === 'recent' && (
           <Box sx={{ mb: 8 }}>
-            {recentRides.length > 0 ? (
-              recentRides.map((ride) => (
-                <Card
-                  key={ride.id}
-                  sx={{
-                    mb: 2,
-                    borderRadius: 3,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    cursor: 'pointer',
-                    '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' },
-                  }}
-                  onClick={() => navigate(`/ride-details/${ride.id}`)}
-                >
-                  <CardContent sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
-                      <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                        {ride.title}
-                      </Typography>
-                      <Chip
-                        label={ride.status || 'upcoming'}
-                        size="small"
-                        sx={{
-                          bgcolor: ride.status === 'completed' ? '#dcfce7'
-                            : ride.status === 'ongoing' ? '#fef3c7' : '#f3e8ff',
-                          color: ride.status === 'completed' ? '#059669'
-                            : ride.status === 'ongoing' ? '#d97706' : '#7c3aed',
-                          fontWeight: 600,
-                          fontSize: '0.75rem',
-                          textTransform: 'capitalize',
-                        }}
-                      />
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <CalendarToday sx={{ fontSize: 14, color: '#94a3b8' }} />
-                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                        {formatDate(ride.date)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <LocationOn sx={{ fontSize: 14, color: '#94a3b8' }} />
-                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                        {ride.meetingPoint} → {ride.destination}
-                      </Typography>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
+            {recentRides.length > 0 ? recentRides.map((ride) => (
+              <Card key={ride.id} sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', cursor: 'pointer', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' } }} onClick={() => navigate(`/ride-details/${ride.id}`)}>
+                <CardContent sx={{ p: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>{ride.title}</Typography>
+                    <Chip
+                      label={ride.status || 'upcoming'} size="small"
+                      sx={{
+                        bgcolor: ride.status === 'completed' ? '#dcfce7' : ride.status === 'ongoing' ? '#fef3c7' : '#f3e8ff',
+                        color: ride.status === 'completed' ? '#059669' : ride.status === 'ongoing' ? '#d97706' : '#7c3aed',
+                        fontWeight: 600, fontSize: '0.75rem', textTransform: 'capitalize',
+                      }}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <CalendarToday sx={{ fontSize: 14, color: '#94a3b8' }} />
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>{formatDate(ride.date)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <LocationOn sx={{ fontSize: 14, color: '#94a3b8' }} />
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>{ride.meetingPoint} → {ride.destination}</Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            )) : (
               <Box sx={{ textAlign: 'center', py: 4, mb: 10 }}>
                 <DirectionsBike sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  No recent rides yet
-                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>No recent rides yet</Typography>
               </Box>
             )}
           </Box>
         )}
 
-        {/* Badges Content */}
+        {/* Badges */}
         {activeTab === 'badges' && (
           <Box sx={{ mb: 8 }}>
-            {/* First Ride Badge */}
             {totalRides >= 1 && (
               <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                 <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
@@ -456,8 +325,6 @@ export default function Profile() {
                 </CardContent>
               </Card>
             )}
-
-            {/* 5 Rides Badge */}
             {totalRides >= 5 && (
               <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                 <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
@@ -471,8 +338,6 @@ export default function Profile() {
                 </CardContent>
               </Card>
             )}
-
-            {/* Verified Badge */}
             {userData?.verified && (
               <Card sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                 <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
@@ -486,17 +351,11 @@ export default function Profile() {
                 </CardContent>
               </Card>
             )}
-
-            {/* No badges yet */}
             {totalRides < 1 && !userData?.verified && (
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <EmojiEvents sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
-                <Typography variant="body1" sx={{ fontWeight: 600, color: '#64748b', mb: 0.5 }}>
-                  No badges earned yet.
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                  Complete rides to earn your first badge!
-                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: '#64748b', mb: 0.5 }}>No badges earned yet.</Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8' }}>Complete rides to earn your first badge!</Typography>
               </Box>
             )}
           </Box>
@@ -504,18 +363,7 @@ export default function Profile() {
       </Container>
 
       {/* Bottom Navigation */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          bgcolor: 'white',
-          borderTop: '1px solid #e5e7eb',
-          py: 1.5,
-          zIndex: 1000,
-        }}
-      >
+      <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, bgcolor: 'white', borderTop: '1px solid #e5e7eb', py: 1.5, zIndex: 1000 }}>
         <Container maxWidth="sm">
           <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
             <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
