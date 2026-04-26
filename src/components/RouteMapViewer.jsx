@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-google-maps/api';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import {
   Dialog,
   DialogContent,
@@ -8,172 +9,192 @@ import {
   Typography,
   CircularProgress,
 } from '@mui/material';
-import {
-  MyLocation,
-} from '@mui/icons-material';
+import { MyLocation } from '@mui/icons-material';
 
-const containerStyle = {
-  width: '100%',
-  height: '500px',
-  borderRadius: '12px',
-};
+// Fix default marker icons for Leaflet with Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
-export default function RouteMapViewer({ open, onClose, meetingPoint, destination, meetingPointCoords, destinationCoords }) {
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-  });
+// Green marker for meeting point
+const greenIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
-  const [map, setMap] = useState(null);
-  const [directions, setDirections] = useState(null);
+// Red marker for destination
+const redIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
-  const onLoad = useCallback((map) => {
-    setMap(map);
-  }, []);
-
-  const onUnmount = useCallback(() => {
-    setMap(null);
-  }, []);
-
-  // Calculate route when dialog opens
+// Component to fit map bounds around both markers
+function FitBounds({ meetingPointCoords, destinationCoords }) {
+  const map = useMap();
   useEffect(() => {
-    if (open && meetingPointCoords && destinationCoords && isLoaded) {
-      const directionsService = new window.google.maps.DirectionsService();
-      
-      directionsService.route(
-        {
-          origin: { lat: meetingPointCoords.lat, lng: meetingPointCoords.lng },
-          destination: { lat: destinationCoords.lat, lng: destinationCoords.lng },
-          travelMode: window.google.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (status === 'OK') {
-            setDirections(result);
-          } else {
-            console.error('Directions request failed:', status);
-          }
-        }
+    if (meetingPointCoords && destinationCoords) {
+      const bounds = L.latLngBounds(
+        [meetingPointCoords.lat, meetingPointCoords.lng],
+        [destinationCoords.lat, destinationCoords.lng]
       );
+      map.fitBounds(bounds, { padding: [40, 40] });
     }
-  }, [open, meetingPointCoords, destinationCoords, isLoaded]);
+  }, [meetingPointCoords, destinationCoords]);
+  return null;
+}
 
-  // Center map to show both markers
+export default function RouteMapViewer({
+  open,
+  onClose,
+  meetingPoint,
+  destination,
+  meetingPointCoords,
+  destinationCoords,
+}) {
+  const [routePoints, setRoutePoints] = useState([]);
+  const [loadingRoute, setLoadingRoute] = useState(false);
+
+  // Fetch route from OSRM (free routing service)
   useEffect(() => {
-    if (map && meetingPointCoords && destinationCoords) {
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend({ lat: meetingPointCoords.lat, lng: meetingPointCoords.lng });
-      bounds.extend({ lat: destinationCoords.lat, lng: destinationCoords.lng });
-      map.fitBounds(bounds);
+    if (open && meetingPointCoords && destinationCoords) {
+      fetchRoute();
     }
-  }, [map, meetingPointCoords, destinationCoords]);
+  }, [open, meetingPointCoords, destinationCoords]);
 
-  const handleCenterMap = () => {
-    if (map && meetingPointCoords && destinationCoords) {
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend({ lat: meetingPointCoords.lat, lng: meetingPointCoords.lng });
-      bounds.extend({ lat: destinationCoords.lat, lng: destinationCoords.lng });
-      map.fitBounds(bounds);
+  const fetchRoute = async () => {
+    setLoadingRoute(true);
+    try {
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${meetingPointCoords.lng},${meetingPointCoords.lat};${destinationCoords.lng},${destinationCoords.lat}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
+      if (data.routes && data.routes.length > 0) {
+        // Convert GeoJSON coordinates [lng, lat] to Leaflet [lat, lng]
+        const points = data.routes[0].geometry.coordinates.map(
+          ([lng, lat]) => [lat, lng]
+        );
+        setRoutePoints(points);
+      }
+    } catch (err) {
+      console.error('Route fetch error:', err);
+      // Fallback — straight line between two points
+      if (meetingPointCoords && destinationCoords) {
+        setRoutePoints([
+          [meetingPointCoords.lat, meetingPointCoords.lng],
+          [destinationCoords.lat, destinationCoords.lng],
+        ]);
+      }
+    } finally {
+      setLoadingRoute(false);
     }
   };
 
-  if (!isLoaded) {
-    return (
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogContent>
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress sx={{ color: '#7c3aed' }} />
-          </Box>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Default center if no coordinates
-  const defaultCenter = meetingPointCoords || { lat: 27.7172, lng: 85.3240 };
+  const defaultCenter = meetingPointCoords
+    ? [meetingPointCoords.lat, meetingPointCoords.lng]
+    : [27.7172, 85.324];
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <Box sx={{ p: 3 }}>
-        {/* Header with Center Button */}
+        {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
             Route Map
           </Typography>
-          <Button
-            onClick={handleCenterMap}
-            size="small"
-            startIcon={<MyLocation />}
-            sx={{
-              textTransform: 'none',
-              color: '#7c3aed',
-              fontWeight: 600,
-            }}
-          >
-            Center
-          </Button>
+          {loadingRoute && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={16} sx={{ color: '#7c3aed' }} />
+              <Typography variant="caption" sx={{ color: '#64748b' }}>Loading route...</Typography>
+            </Box>
+          )}
         </Box>
 
-        {/* Google Map */}
-        <GoogleMap
-          mapContainerStyle={containerStyle}
-          center={defaultCenter}
-          zoom={13}
-          onLoad={onLoad}
-          onUnmount={onUnmount}
-          options={{
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: true,
-            zoomControl: true,
-            gestureHandling: 'greedy',
-            scrollwheel: true,
-          }}
-        >
-          {/* Show Route/Path */}
-          {directions && (
-            <DirectionsRenderer
-              directions={directions}
-              options={{
-                suppressMarkers: true,
-                polylineOptions: {
-                  strokeColor: '#7c3aed',
-                  strokeWeight: 6,
-                  strokeOpacity: 0.8,
-                },
-              }}
-            />
-          )}
+        {/* Route info */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#22c55e' }} />
+            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+              {meetingPoint || 'Meeting Point'}
+            </Typography>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#94a3b8' }}>→</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#ef4444' }} />
+            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
+              {destination || 'Destination'}
+            </Typography>
+          </Box>
+        </Box>
 
-          {/* Meeting Point Marker */}
-          {meetingPointCoords && (
-            <Marker
-              position={{ lat: meetingPointCoords.lat, lng: meetingPointCoords.lng }}
-              icon={{
-                url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
-              }}
-              label={{
-                text: 'A',
-                color: 'white',
-                fontWeight: 'bold',
-              }}
+        {/* Map */}
+        <Box sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+          <MapContainer
+            center={defaultCenter}
+            zoom={13}
+            style={{ width: '100%', height: '450px' }}
+            scrollWheelZoom={true}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-          )}
 
-          {/* Destination Marker */}
-          {destinationCoords && (
-            <Marker
-              position={{ lat: destinationCoords.lat, lng: destinationCoords.lng }}
-              icon={{
-                url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-              }}
-              label={{
-                text: 'B',
-                color: 'white',
-                fontWeight: 'bold',
-              }}
-            />
-          )}
-        </GoogleMap>
+            {/* Auto fit bounds */}
+            {meetingPointCoords && destinationCoords && (
+              <FitBounds
+                meetingPointCoords={meetingPointCoords}
+                destinationCoords={destinationCoords}
+              />
+            )}
+
+            {/* Route polyline */}
+            {routePoints.length > 0 && (
+              <Polyline
+                positions={routePoints}
+                color="#7c3aed"
+                weight={5}
+                opacity={0.8}
+              />
+            )}
+
+            {/* Meeting Point Marker */}
+            {meetingPointCoords && (
+              <Marker
+                position={[meetingPointCoords.lat, meetingPointCoords.lng]}
+                icon={greenIcon}
+              >
+                <Popup>
+                  <strong>📍 Meeting Point</strong><br />
+                  {meetingPoint}
+                </Popup>
+              </Marker>
+            )}
+
+            {/* Destination Marker */}
+            {destinationCoords && (
+              <Marker
+                position={[destinationCoords.lat, destinationCoords.lng]}
+                icon={redIcon}
+              >
+                <Popup>
+                  <strong>🏁 Destination</strong><br />
+                  {destination}
+                </Popup>
+              </Marker>
+            )}
+          </MapContainer>
+        </Box>
 
         {/* Close Button */}
         <Button

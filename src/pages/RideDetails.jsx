@@ -53,6 +53,8 @@ export default function RideDetails() {
   const [showCancelConfirmDialog, setShowCancelConfirmDialog] = useState(false);
   const [showStartConfirmDialog, setShowStartConfirmDialog] = useState(false);
   const [showCompleteConfirmDialog, setShowCompleteConfirmDialog] = useState(false);
+  const [showCancelSuccessDialog, setShowCancelSuccessDialog] = useState(false);
+  const [showCancelErrorDialog, setShowCancelErrorDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [isParticipant, setIsParticipant] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
@@ -94,7 +96,7 @@ export default function RideDetails() {
   };
 
   const handleJoinRide = async () => {
-    if (!user) { alert('Please login to join this ride'); return; }
+    if (!user) return;
     setActionLoading(true);
     try {
       const participantData = {
@@ -105,39 +107,35 @@ export default function RideDetails() {
       };
       const rideRef = doc(db, 'rides', rideId);
       const rideDoc = await getDoc(rideRef);
-      if (!rideDoc.exists()) { alert('Ride not found'); setActionLoading(false); return; }
+      if (!rideDoc.exists()) { setActionLoading(false); return; }
       const currentRide = rideDoc.data();
       const currentParticipants = currentRide.participants || [];
       const alreadyJoined = currentParticipants.some(p => p.userId === user.uid);
-      if (alreadyJoined) { alert('You have already joined this ride'); setActionLoading(false); return; }
+      if (alreadyJoined) { setActionLoading(false); return; }
       await updateDoc(rideRef, { participants: [...currentParticipants, participantData] });
       await fetchRideDetails();
-      // Notify organizer
-await sendNotification(
-  currentRide.createdBy,
-  'ride_joined',
-  '👤 New Participant',
-  `${user.displayName || 'Someone'} joined your ride "${currentRide.title}"`,
-  rideId
-);
-
-// Notify all other existing participants
-for (const p of currentParticipants) {
-  const participantId = typeof p === 'object' ? p.userId : p;
-  if (participantId && participantId !== user.uid && participantId !== currentRide.createdBy) {
-    await sendNotification(
-      participantId,
-      'ride_joined',
-      '👤 Rider Joined',
-      `${user.displayName || 'Someone'} also joined "${currentRide.title}"`,
-      rideId
-    );
-  }
-}
+      await sendNotification(
+        currentRide.createdBy,
+        'ride_joined',
+        '👤 New Participant',
+        `${user.displayName || 'Someone'} joined your ride "${currentRide.title}"`,
+        rideId
+      );
+      for (const p of currentParticipants) {
+        const participantId = typeof p === 'object' ? p.userId : p;
+        if (participantId && participantId !== user.uid && participantId !== currentRide.createdBy) {
+          await sendNotification(
+            participantId,
+            'ride_joined',
+            '👤 Rider Joined',
+            `${user.displayName || 'Someone'} also joined "${currentRide.title}"`,
+            rideId
+          );
+        }
+      }
       setShowJoinSuccessDialog(true);
     } catch (error) {
       console.error('Error joining ride:', error);
-      alert(`Failed to join ride: ${error.message}`);
     } finally {
       setActionLoading(false);
     }
@@ -150,31 +148,27 @@ for (const p of currentParticipants) {
       const updatedParticipants = ride.participants.filter(p => p.userId !== user.uid);
       await updateDoc(doc(db, 'rides', rideId), { participants: updatedParticipants });
       await fetchRideDetails();
-      // Notify organizer
-await sendNotification(
-  ride.createdBy,
-  'ride_left',
-  '👋 Participant Left',
-  `${user.displayName || 'Someone'} left your ride "${ride.title}"`,
-  rideId
-);
-
-// Notify remaining participants
-for (const p of updatedParticipants) {
-  const participantId = typeof p === 'object' ? p.userId : p;
-  if (participantId && participantId !== user.uid && participantId !== ride.createdBy) {
-    await sendNotification(
-      participantId,
-      'ride_left',
-      '👋 Rider Left',
-      `${user.displayName || 'Someone'} left "${ride.title}"`,
-      rideId
-    );
-  }
-}
+      await sendNotification(
+        ride.createdBy,
+        'ride_left',
+        '👋 Participant Left',
+        `${user.displayName || 'Someone'} left your ride "${ride.title}"`,
+        rideId
+      );
+      for (const p of updatedParticipants) {
+        const participantId = typeof p === 'object' ? p.userId : p;
+        if (participantId && participantId !== user.uid && participantId !== ride.createdBy) {
+          await sendNotification(
+            participantId,
+            'ride_left',
+            '👋 Rider Left',
+            `${user.displayName || 'Someone'} left "${ride.title}"`,
+            rideId
+          );
+        }
+      }
     } catch (error) {
       console.error('Error leaving ride:', error);
-      alert('Failed to leave ride. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -186,22 +180,20 @@ for (const p of updatedParticipants) {
     try {
       await updateDoc(doc(db, 'rides', rideId), { status: 'ongoing', startedAt: new Date() });
       await fetchRideDetails();
-      // Notify all participants
-for (const p of ride.participants) {
-  const participantId = typeof p === 'object' ? p.userId : p;
-  if (participantId && participantId !== user.uid) {
-    await sendNotification(
-      participantId,
-      'ride_started',
-      '🏍️ Ride Started!',
-      `"${ride.title}" has started. Get ready to ride!`,
-      rideId
-    );
-  }
-}
+      for (const p of ride.participants) {
+        const participantId = typeof p === 'object' ? p.userId : p;
+        if (participantId && participantId !== user.uid) {
+          await sendNotification(
+            participantId,
+            'ride_started',
+            '🏍️ Ride Started!',
+            `"${ride.title}" has started. Get ready to ride!`,
+            rideId
+          );
+        }
+      }
     } catch (error) {
       console.error('Error starting ride:', error);
-      alert('Failed to start ride. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -213,22 +205,20 @@ for (const p of ride.participants) {
     try {
       await updateDoc(doc(db, 'rides', rideId), { status: 'completed', completedAt: new Date() });
       await fetchRideDetails();
-      // Notify all participants
-for (const p of ride.participants) {
-  const participantId = typeof p === 'object' ? p.userId : p;
-  if (participantId && participantId !== user.uid) {
-    await sendNotification(
-      participantId,
-      'ride_completed',
-      '✅ Ride Completed',
-      `"${ride.title}" has been completed. Rate your experience!`,
-      rideId
-    );
-  }
-}
+      for (const p of ride.participants) {
+        const participantId = typeof p === 'object' ? p.userId : p;
+        if (participantId && participantId !== user.uid) {
+          await sendNotification(
+            participantId,
+            'ride_completed',
+            '✅ Ride Completed',
+            `"${ride.title}" has been completed. Rate your experience!`,
+            rideId
+          );
+        }
+      }
     } catch (error) {
       console.error('Error completing ride:', error);
-      alert('Failed to complete ride. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -239,25 +229,24 @@ for (const p of ride.participants) {
     setActionLoading(true);
     try {
       const rideSnap = await getDoc(doc(db, 'rides', rideId));
-const rideToCancel = rideSnap.data();
-for (const p of rideToCancel.participants || []) {
-  const participantId = typeof p === 'object' ? p.userId : p;
-  if (participantId && participantId !== user.uid) {
-    await sendNotification(
-      participantId,
-      'ride_cancelled',
-      '❌ Ride Cancelled',
-      `"${rideToCancel.title}" has been cancelled by the organizer`,
-      rideId
-    );
-  }
-}
+      const rideToCancel = rideSnap.data();
+      for (const p of rideToCancel.participants || []) {
+        const participantId = typeof p === 'object' ? p.userId : p;
+        if (participantId && participantId !== user.uid) {
+          await sendNotification(
+            participantId,
+            'ride_cancelled',
+            '❌ Ride Cancelled',
+            `"${rideToCancel.title}" has been cancelled by the organizer`,
+            rideId
+          );
+        }
+      }
       await deleteDoc(doc(db, 'rides', rideId));
-      alert('Ride cancelled and deleted successfully!');
-      navigate('/dashboard');
+      setShowCancelSuccessDialog(true);
     } catch (error) {
       console.error('Error cancelling ride:', error);
-      alert('Failed to cancel ride. Please try again.');
+      setShowCancelErrorDialog(true);
     } finally {
       setActionLoading(false);
     }
@@ -536,9 +525,11 @@ for (const p of rideToCancel.participants || []) {
         </Container>
       </Box>
 
-      {/* All Dialogs */}
+      {/* ── ALL DIALOGS ── */}
+
       <RouteMapViewer open={showMapViewer} onClose={() => setShowMapViewer(false)} meetingPoint={ride.meetingPoint} destination={ride.destination} meetingPointCoords={ride.meetingPointCoords} destinationCoords={ride.destinationCoords} />
 
+      {/* Join Success */}
       <Dialog open={showJoinSuccessDialog} onClose={() => setShowJoinSuccessDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 1, maxWidth: '400px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
@@ -547,13 +538,14 @@ for (const p of rideToCancel.participants || []) {
           <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>You're In!</Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', pb: 2 }}>
-          <Typography variant="body1" sx={{ color: '#64748b', mb: 1 }}>You are now participating in this ride!</Typography>
+          <Typography variant="body1" sx={{ color: '#64748b' }}>You are now participating in this ride!</Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
           <Button variant="contained" onClick={() => setShowJoinSuccessDialog(false)} sx={{ bgcolor: '#7c3aed', px: 4, py: 1.5, textTransform: 'none', fontWeight: 600, borderRadius: 2, '&:hover': { bgcolor: '#6d28d9' } }}>Got it!</Button>
         </DialogActions>
       </Dialog>
 
+      {/* Leave Confirm */}
       <Dialog open={showLeaveConfirmDialog} onClose={() => setShowLeaveConfirmDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 1, maxWidth: '400px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <ExitToApp sx={{ fontSize: 60, color: '#ef4444', mb: 2 }} />
@@ -568,13 +560,14 @@ for (const p of rideToCancel.participants || []) {
         </DialogActions>
       </Dialog>
 
+      {/* Start Confirm */}
       <Dialog open={showStartConfirmDialog} onClose={() => setShowStartConfirmDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 1, maxWidth: '400px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <PlayArrow sx={{ fontSize: 60, color: '#10b981', mb: 2 }} />
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Start This Ride?</Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center' }}>
-          <Typography variant="body2" sx={{ color: '#64748b' }}>This will mark the ride as ongoing.</Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>This will mark the ride as ongoing and notify all participants.</Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
           <Button onClick={() => setShowStartConfirmDialog(false)} sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600 }}>Cancel</Button>
@@ -582,13 +575,14 @@ for (const p of rideToCancel.participants || []) {
         </DialogActions>
       </Dialog>
 
+      {/* Complete Confirm */}
       <Dialog open={showCompleteConfirmDialog} onClose={() => setShowCompleteConfirmDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 1, maxWidth: '400px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <CheckCircleOutline sx={{ fontSize: 60, color: '#7c3aed', mb: 2 }} />
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Complete This Ride?</Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center' }}>
-          <Typography variant="body2" sx={{ color: '#64748b' }}>This will mark the ride as completed.</Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>This will mark the ride as completed and notify all participants.</Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
           <Button onClick={() => setShowCompleteConfirmDialog(false)} sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600 }}>Cancel</Button>
@@ -596,20 +590,67 @@ for (const p of rideToCancel.participants || []) {
         </DialogActions>
       </Dialog>
 
+      {/* Cancel Confirm */}
       <Dialog open={showCancelConfirmDialog} onClose={() => setShowCancelConfirmDialog(false)} PaperProps={{ sx: { borderRadius: 4, p: 1, maxWidth: '400px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <WarningIcon sx={{ fontSize: 60, color: '#ef4444', mb: 2 }} />
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Cancel & Delete Ride?</Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center' }}>
-          <Typography variant="body2" sx={{ color: '#64748b' }}>This will permanently delete the ride.</Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>This will permanently delete the ride and notify all participants.</Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
-          <Button onClick={() => setShowCancelConfirmDialog(false)} sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600 }}>Cancel</Button>
-          <Button variant="contained" onClick={handleCancelRide} sx={{ bgcolor: '#ef4444', px: 3, textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#dc2626' } }}>Delete Ride</Button>
+          <Button onClick={() => setShowCancelConfirmDialog(false)} sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600 }}>Keep Ride</Button>
+          <Button variant="contained" onClick={handleCancelRide} disabled={actionLoading}
+            sx={{ bgcolor: '#ef4444', px: 3, textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#dc2626' } }}>
+            {actionLoading ? <CircularProgress size={22} color="inherit" /> : 'Delete Ride'}
+          </Button>
         </DialogActions>
       </Dialog>
 
+      {/* ── Cancel Success Dialog ── */}
+      <Dialog open={showCancelSuccessDialog} onClose={() => { setShowCancelSuccessDialog(false); navigate('/dashboard'); }} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
+        <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
+          <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
+            <CheckCircle sx={{ fontSize: 50, color: '#22c55e' }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Ride Cancelled</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', pb: 1 }}>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            The ride has been cancelled and all participants have been notified.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button variant="contained" onClick={() => { setShowCancelSuccessDialog(false); navigate('/dashboard'); }}
+            sx={{ bgcolor: '#7c3aed', px: 4, py: 1.5, textTransform: 'none', fontWeight: 600, borderRadius: 2, '&:hover': { bgcolor: '#6d28d9' } }}>
+            Back to Dashboard
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Cancel Error Dialog ── */}
+      <Dialog open={showCancelErrorDialog} onClose={() => setShowCancelErrorDialog(false)} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
+        <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
+          <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
+            <WarningIcon sx={{ fontSize: 50, color: '#ef4444' }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Failed to Cancel</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', pb: 1 }}>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Something went wrong while cancelling the ride. Please try again.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button variant="contained" onClick={() => setShowCancelErrorDialog(false)}
+            sx={{ bgcolor: '#ef4444', px: 4, py: 1.5, textTransform: 'none', fontWeight: 600, borderRadius: 2, '&:hover': { bgcolor: '#dc2626' } }}>
+            Try Again
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Participants Dialog */}
       <Dialog open={showParticipantsDialog} onClose={() => setShowParticipantsDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4, m: 2, maxHeight: '70vh' } }}>
         <DialogTitle sx={{ pb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
