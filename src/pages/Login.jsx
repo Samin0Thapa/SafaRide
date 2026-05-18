@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import {
@@ -23,6 +23,7 @@ export default function Login() {
     password: '',
   });
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -31,46 +32,55 @@ export default function Login() {
       ...formData,
       [e.target.name]: e.target.value,
     });
-    // Clear error when user starts typing
     if (error) setError('');
+    if (successMessage) setSuccessMessage('');
+  };
+
+  const handleForgotPassword = async () => {
+    if (!formData.email) {
+      setError('Enter your email address first.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, formData.email);
+      setError('');
+      setSuccessMessage('Password reset email sent! Check your inbox.');
+    } catch (e) {
+      setError('Could not send reset email. Check the address.');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setLoading(true);
 
     try {
-      // Firebase login
       const userCredential = await signInWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
-      
+
       console.log('Login successful:', userCredential.user);
-      
-      // Fetch user data from Firestore to check role
+
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      
+
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        
-        // Redirect based on role
+
         if (userData.role === 'admin') {
           navigate('/admin/dashboard');
         } else {
           navigate('/dashboard');
         }
       } else {
-        // If no user document exists (old users), just go to dashboard
         navigate('/dashboard');
       }
-      
     } catch (error) {
       console.error('Login error:', error);
-      
-      // Handle different error types
+
       switch (error.code) {
         case 'auth/invalid-email':
           setError('Invalid email address.');
@@ -143,6 +153,13 @@ export default function Login() {
           </Alert>
         )}
 
+        {/* Success Alert */}
+        {successMessage && (
+          <Alert severity="success" sx={{ mb: 3 }}>
+            {successMessage}
+          </Alert>
+        )}
+
         {/* Login Form */}
         <Box
           component="form"
@@ -188,12 +205,27 @@ export default function Login() {
               ),
             }}
             sx={{
-              mb: 4,
+              mb: 1,
               '& .MuiOutlinedInput-root': {
                 borderRadius: 2,
               },
             }}
           />
+
+          {/* Forgot Password Link */}
+          <Typography
+            variant="body2"
+            onClick={handleForgotPassword}
+            sx={{
+              color: '#7c3aed',
+              cursor: 'pointer',
+              textAlign: 'right',
+              mb: 2,
+              '&:hover': { textDecoration: 'underline' },
+            }}
+          >
+            Forgot password?
+          </Typography>
 
           {/* Spacer */}
           <Box sx={{ flex: 1 }} />
