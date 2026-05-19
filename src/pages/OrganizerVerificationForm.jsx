@@ -126,9 +126,10 @@ export default function OrganizerVerificationForm() {
     }
   };
 
+  // FIX #1 — was '/become-organizer'
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false);
-    navigate('/become-organizer');
+    navigate('/trust-verification');
   };
 
   return (
@@ -150,10 +151,10 @@ export default function OrganizerVerificationForm() {
           color: 'white',
         }}
       >
-        {/* Back Button + Title */}
+        {/* Back Button + Title — FIX #2: was '/become-organizer' */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <IconButton
-            onClick={() => navigate('/become-organizer')}
+            onClick={() => navigate('/trust-verification')}
             sx={{ color: 'white', p: 0 }}
             disabled={loading}
           >
@@ -587,6 +588,7 @@ export default function OrganizerVerificationForm() {
           <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
             Our team will review your application within 1-3 business days.
           </Typography>
+          {/* FIX #3 — was '/become-organizer', now calls handleCloseSuccessDialog */}
           <Button
             fullWidth
             variant="contained"

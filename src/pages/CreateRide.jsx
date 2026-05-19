@@ -298,11 +298,13 @@ export default function CreateRide() {
                 onChange={handleChange}
                 disabled={loading}
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ min: new Date().toISOString().split('T')[0] }}  // ADD THIS LINE
                 sx={{
                   bgcolor: '#f5f5f5',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
+
             </Box>
             <Box sx={{ flex: 1 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>

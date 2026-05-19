@@ -18,6 +18,8 @@ import {
   DialogActions,
   Divider,
   Fab,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -58,6 +60,7 @@ export default function RideDetails() {
   const [actionLoading, setActionLoading] = useState(false);
   const [isParticipant, setIsParticipant] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -97,6 +100,12 @@ export default function RideDetails() {
 
   const handleJoinRide = async () => {
     if (!user) return;
+
+    if (isFull) {
+      setSnackbar({ open: true, message: 'Sorry, this ride is already full.', severity: 'error' });
+      return;
+    }
+
     setActionLoading(true);
     try {
       const participantData = {
@@ -112,6 +121,14 @@ export default function RideDetails() {
       const currentParticipants = currentRide.participants || [];
       const alreadyJoined = currentParticipants.some(p => p.userId === user.uid);
       if (alreadyJoined) { setActionLoading(false); return; }
+
+      // Double-check capacity at write time
+      if (currentParticipants.length >= (currentRide.maxParticipants || 10)) {
+        setSnackbar({ open: true, message: 'Sorry, this ride just filled up.', severity: 'error' });
+        setActionLoading(false);
+        return;
+      }
+
       await updateDoc(rideRef, { participants: [...currentParticipants, participantData] });
       await fetchRideDetails();
       await sendNotification(
@@ -136,6 +153,7 @@ export default function RideDetails() {
       setShowJoinSuccessDialog(true);
     } catch (error) {
       console.error('Error joining ride:', error);
+      setSnackbar({ open: true, message: 'Failed to join ride. Please try again.', severity: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -486,7 +504,7 @@ export default function RideDetails() {
                 </Button>
               ) : (
                 <Button variant="contained" startIcon={<Person />} onClick={handleJoinRide} disabled={actionLoading || isFull}
-                  sx={{ flex: 1, bgcolor: '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: '#6d28d9' }, '&:disabled': { bgcolor: '#cbd5e1' } }}>
+                  sx={{ flex: 1, bgcolor: isFull ? '#94a3b8' : '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: isFull ? '#94a3b8' : '#6d28d9' }, '&:disabled': { bgcolor: '#cbd5e1' } }}>
                   {actionLoading ? <CircularProgress size={24} color="inherit" /> : isFull ? 'Ride Full' : 'Join Ride'}
                 </Button>
               )}
@@ -608,7 +626,7 @@ export default function RideDetails() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Cancel Success Dialog ── */}
+      {/* Cancel Success Dialog */}
       <Dialog open={showCancelSuccessDialog} onClose={() => { setShowCancelSuccessDialog(false); navigate('/dashboard'); }} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
@@ -629,7 +647,7 @@ export default function RideDetails() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Cancel Error Dialog ── */}
+      {/* Cancel Error Dialog */}
       <Dialog open={showCancelErrorDialog} onClose={() => setShowCancelErrorDialog(false)} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
@@ -682,6 +700,22 @@ export default function RideDetails() {
           </Box>
         </DialogContent>
       </Dialog>
+
+      {/* Snackbar for toast notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%', borderRadius: 2, fontWeight: 600 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
     </Box>
   );
