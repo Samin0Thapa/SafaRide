@@ -17,6 +17,8 @@ import {
   Badge,
   Tabs,
   Tab,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -31,6 +33,7 @@ import {
   Home,
   Star,
   Badge as BadgeIcon,
+  Search,
 } from '@mui/icons-material';
 
 export default function JoinRide() {
@@ -45,6 +48,7 @@ export default function JoinRide() {
   const [selectedFilter, setSelectedFilter] = useState('All Rides');
   const [userRole, setUserRole] = useState(null);
   const [activeTab, setActiveTab] = useState(0); // 0 = Active, 1 = Completed
+  const [locationSearch, setLocationSearch] = useState('');
 
   // Listen for auth state changes
   useEffect(() => {
@@ -85,15 +89,20 @@ export default function JoinRide() {
     fetchRides();
   }, []);
 
-  // Re-filter when tab or filter changes
+  // Re-filter when tab, filter, or location search changes
   useEffect(() => {
     const source = activeTab === 0 ? rides : completedRides;
-    if (selectedFilter === 'All Rides') {
-      setFilteredRides(source);
-    } else {
-      setFilteredRides(source.filter(ride => ride.rideType === selectedFilter));
-    }
-  }, [selectedFilter, rides, completedRides, activeTab]);
+    const loc = locationSearch.toLowerCase();
+    const filtered = source.filter(ride => {
+      const matchesType = selectedFilter === 'All Rides' ||
+        ride.rideType === selectedFilter;
+      const matchesLocation = !loc ||
+        (ride.meetingPoint || '').toLowerCase().includes(loc) ||
+        (ride.destination || '').toLowerCase().includes(loc);
+      return matchesType && matchesLocation;
+    });
+    setFilteredRides(filtered);
+  }, [selectedFilter, locationSearch, rides, completedRides, activeTab]);
 
   const fetchRides = async () => {
     try {
@@ -170,6 +179,7 @@ export default function JoinRide() {
   const handleTabChange = (e, val) => {
     setActiveTab(val);
     setSelectedFilter('All Rides');
+    setLocationSearch('');
   };
 
   const handleViewDetails = (rideId) => {
@@ -334,6 +344,30 @@ export default function JoinRide() {
       {/* Content */}
       <Container maxWidth="sm" sx={{ py: 3, px: 2, flex: 1, pb: 10 }}>
 
+        {/* Location Search */}
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search by location (e.g. Kathmandu)..."
+          value={locationSearch}
+          onChange={(e) => setLocationSearch(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ color: '#94a3b8', fontSize: 18 }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            mb: 2,
+            bgcolor: 'white',
+            borderRadius: 2,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+            },
+          }}
+        />
+
         {/* Active Filter Display */}
         {selectedFilter !== 'All Rides' && (
           <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -391,12 +425,16 @@ export default function JoinRide() {
             <DirectionsBike sx={{ fontSize: 80, color: '#cbd5e1', mb: 2 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#64748b', mb: 1 }}>
               {activeTab === 0
-                ? selectedFilter === 'All Rides' ? 'No rides available' : `No ${selectedFilter}s available`
+                ? selectedFilter === 'All Rides' && !locationSearch
+                  ? 'No rides available'
+                  : 'No rides match your search'
                 : 'No completed rides yet'}
             </Typography>
             <Typography variant="body2" sx={{ color: '#94a3b8', mb: 2 }}>
               {activeTab === 0
-                ? selectedFilter === 'All Rides' ? 'Be the first to create a ride!' : 'Try a different filter or create a ride!'
+                ? selectedFilter === 'All Rides' && !locationSearch
+                  ? 'Be the first to create a ride!'
+                  : 'Try a different filter or location'
                 : 'Completed rides will appear here so you can rate them'}
             </Typography>
             {activeTab === 0 && (userRole === 'organizer' || userRole === 'admin') && (
