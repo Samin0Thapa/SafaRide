@@ -46,12 +46,12 @@ export default function TrustVerification() {
           email: user.email,
           verified: false,
           isOrganizer: false,
-          totalRides: 47,
-          completedRides: 45,
-          organizedRides: 12,
-          completionRate: 92,
-          rating: 4.8,
-          memberSince: '2026',
+          totalRides: 0,
+          completedRides: 0,
+          organizedRides: 0,
+          completionRate: 0,
+          rating: 0,
+          memberSince: new Date().getFullYear().toString(),
         });
       }
     } catch (error) {
@@ -137,7 +137,7 @@ export default function TrustVerification() {
 
             {/* Member Since */}
             <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
-              Member since {userData?.memberSince || '2026'}
+              Member since {userData?.memberSince ?? new Date().getFullYear().toString()}
             </Typography>
 
             {/* Rating Card */}
@@ -154,7 +154,7 @@ export default function TrustVerification() {
                   Trust Score
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 700, color: '#1e293b', mb: 1 }}>
-                  {userData?.rating || 4.8}/5
+                  {userData?.rating ?? 0}/5
                 </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -162,7 +162,7 @@ export default function TrustVerification() {
                       key={star}
                       sx={{
                         fontSize: 24,
-                        color: star <= 4 ? '#fbbf24' : '#cbd5e1',
+                        color: star <= Math.round(userData?.rating ?? 0) ? '#fbbf24' : '#cbd5e1',
                       }}
                     />
                   ))}
@@ -244,7 +244,7 @@ export default function TrustVerification() {
                 <DirectionsBike sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.totalRides || 47}
+                {userData?.totalRides ?? 0}
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Total Rides
@@ -276,7 +276,7 @@ export default function TrustVerification() {
                 <CheckCircle sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.completedRides || 45}
+                {userData?.completedRides ?? 0}
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Completed Rides
@@ -308,7 +308,7 @@ export default function TrustVerification() {
                 <Flag sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.organizedRides || 12}
+                {userData?.organizedRides ?? 0}
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Organized
@@ -340,7 +340,7 @@ export default function TrustVerification() {
                 <Percent sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.completionRate || 92}%
+                {userData?.completionRate ?? 0}%
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Completion Rate
