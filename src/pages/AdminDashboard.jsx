@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import { sendNotification } from '../services/notifications';
 import {
@@ -60,8 +60,24 @@ export default function AdminDashboard() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedOrganizer, setSelectedOrganizer] = useState(null);
   const [selectedRide, setSelectedRide] = useState(null);
-  const [ridesTab, setRidesTab] = useState(0); // 0 = upcoming, 1 = completed
+  const [ridesTab, setRidesTab] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // FIX #8 — Role check on mount, redirect non-admins immediately
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        navigate('/login');
+        return;
+      }
+      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      if (!userDoc.exists() || userDoc.data().role !== 'admin') {
+        navigate('/dashboard');
+      }
+    };
+    checkAdminRole();
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
@@ -77,7 +93,6 @@ export default function AdminDashboard() {
       const ridesSnapshot = await getDocs(collection(db, 'rides'));
       const totalRides = ridesSnapshot.size;
 
-      // Separate upcoming and completed rides
       const upcoming = [];
       const completed = [];
       ridesSnapshot.forEach((d) => {
@@ -454,7 +469,6 @@ export default function AdminDashboard() {
               {approvedOrganizers.map((organizer) => (
                 <Card key={organizer.id} sx={{ borderRadius: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
                   <CardContent sx={{ p: 2.5 }}>
-                    {/* Fixed layout — no more cut-off badge */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
                       <Avatar sx={{ width: 48, height: 48, bgcolor: '#10b981', fontSize: '1.3rem', fontWeight: 700, flexShrink: 0 }}>
                         {organizer.name?.charAt(0)?.toUpperCase() || 'O'}
@@ -469,7 +483,6 @@ export default function AdminDashboard() {
                       </Box>
                     </Box>
 
-                    {/* Verified badge on its own row — never gets cut off */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#d1fae5', color: '#10b981', px: 1.5, py: 0.5, borderRadius: 2, mb: 1.5, width: 'fit-content' }}>
                       <VerifiedUser sx={{ fontSize: 14 }} />
                       <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Verified Organizer</Typography>
@@ -552,7 +565,7 @@ export default function AdminDashboard() {
         </DialogActions>
       </Dialog>
 
-      {/* ── RIDES DIALOG (Upcoming + Completed tabs) ── */}
+      {/* ── RIDES DIALOG ── */}
       <Dialog open={showRidesDialog} onClose={() => setShowRidesDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4, m: 2, maxHeight: '85vh' } }}>
         <DialogTitle sx={{ pb: 0 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
