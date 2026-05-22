@@ -85,9 +85,12 @@ export default function JoinRide() {
     'Off-Road Adventure',
   ];
 
+  // Fetch rides whenever user is available
   useEffect(() => {
-    fetchRides();
-  }, []);
+    if (user) {
+      fetchRides();
+    }
+  }, [user]); // depends on user so we have uid for completed filtering
 
   // Re-filter when tab, filter, or location search changes
   useEffect(() => {
@@ -138,18 +141,29 @@ export default function JoinRide() {
         });
       });
 
-      // Get completed rides
+      // Get completed rides — only ones the user participated in or created
+      // Firestore can't query array-of-objects with a simple where clause,
+      // so we fetch all completed and filter client-side
       const completedQuery = query(
         collection(db, 'rides'),
         where('status', '==', 'completed')
       );
       const completedSnapshot = await getDocs(completedQuery);
       completedSnapshot.forEach((doc) => {
-        completedData.push({
-          id: doc.id,
-          ...doc.data(),
-        });
+        const rideData = { id: doc.id, ...doc.data() };
+        const isCreator = rideData.createdBy === user.uid;
+        const isParticipant = Array.isArray(rideData.participants) &&
+          rideData.participants.some(p =>
+            (typeof p === 'object' && p.userId === user.uid) || p === user.uid
+          );
+        // Only include if user was involved
+        if (isCreator || isParticipant) {
+          completedData.push(rideData);
+        }
       });
+
+      // Sort completed by most recent first
+      completedData.sort((a, b) => new Date(b.date) - new Date(a.date));
 
       setRides(ridesData);
       setCompletedRides(completedData);
@@ -260,7 +274,7 @@ export default function JoinRide() {
             <ArrowBack />
           </IconButton>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {activeTab === 0 ? 'Join a Ride' : 'Completed Rides'}
+            {activeTab === 0 ? 'Join a Ride' : 'My Completed Rides'}
           </Typography>
         </Box>
 
@@ -302,7 +316,7 @@ export default function JoinRide() {
             }}
           >
             <Tab label={`Active (${rides.length})`} />
-            <Tab label={`Completed (${completedRides.length})`} />
+            <Tab label={`My Completed (${completedRides.length})`} />
           </Tabs>
         </Container>
       </Box>
@@ -392,6 +406,27 @@ export default function JoinRide() {
           </Box>
         )}
 
+        {/* Completed tab info banner */}
+        {activeTab === 1 && completedRides.length > 0 && (
+          <Box
+            sx={{
+              mb: 2,
+              px: 2,
+              py: 1.25,
+              bgcolor: '#f3e8ff',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
+            <Star sx={{ fontSize: 16, color: '#7c3aed' }} />
+            <Typography variant="body2" sx={{ color: '#7c3aed', fontWeight: 500 }}>
+              Showing rides you participated in or organized
+            </Typography>
+          </Box>
+        )}
+
         {/* Loading State */}
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -428,14 +463,18 @@ export default function JoinRide() {
                 ? selectedFilter === 'All Rides' && !locationSearch
                   ? 'No rides available'
                   : 'No rides match your search'
-                : 'No completed rides yet'}
+                : completedRides.length === 0
+                  ? "You haven't completed any rides yet"
+                  : 'No completed rides match your search'}
             </Typography>
             <Typography variant="body2" sx={{ color: '#94a3b8', mb: 2 }}>
               {activeTab === 0
                 ? selectedFilter === 'All Rides' && !locationSearch
                   ? 'Be the first to create a ride!'
                   : 'Try a different filter or location'
-                : 'Completed rides will appear here so you can rate them'}
+                : completedRides.length === 0
+                  ? 'Join a ride and complete it to see your history here'
+                  : 'Try a different filter or location'}
             </Typography>
             {activeTab === 0 && (userRole === 'organizer' || userRole === 'admin') && (
               <Button
