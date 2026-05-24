@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import RouteMapViewer from '../components/RouteMapViewer';
 import { sendNotification } from '../services/notifications';
@@ -18,8 +18,6 @@ import {
   DialogActions,
   Divider,
   Fab,
-  Snackbar,
-  Alert,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -60,7 +58,6 @@ export default function RideDetails() {
   const [actionLoading, setActionLoading] = useState(false);
   const [isParticipant, setIsParticipant] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -72,6 +69,34 @@ export default function RideDetails() {
   useEffect(() => {
     fetchRideDetails();
   }, [rideId]);
+
+  // Real-time SOS listener — watches the ride doc for sosActive flag
+  useEffect(() => {
+    if (!rideId || !user) return;
+
+    const unsubscribe = onSnapshot(doc(db, 'rides', rideId), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+
+      // Only show alert to OTHER participants, not the one who triggered it
+      if (data.sosActive && data.sosTriggeredBy !== user.uid) {
+        setSosAlert({
+          triggeredByName: data.sosTriggeredByName || 'A rider',
+          mapsLink: data.sosMapsLink || null,
+        });
+        startSOSBeepAndVibrate();
+      } else if (!data.sosActive) {
+        // SOS was resolved — clear alert and stop beeping
+        setSosAlert(null);
+        stopSOSBeepAndVibrate();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      stopSOSBeepAndVibrate();
+    };
+  }, [rideId, user]);
 
   useEffect(() => {
     if (ride && user) {
@@ -98,14 +123,47 @@ export default function RideDetails() {
     }
   };
 
+  const startSOSBeepAndVibrate = () => {
+    // Play immediately then repeat every second
+    playSOSBeep();
+    if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
+
+    beepIntervalRef.current = setInterval(() => {
+      playSOSBeep();
+      if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
+    }, 1500);
+  };
+
+  const stopSOSBeepAndVibrate = () => {
+    if (beepIntervalRef.current) {
+      clearInterval(beepIntervalRef.current);
+      beepIntervalRef.current = null;
+    }
+    if ('vibrate' in navigator) navigator.vibrate(0);
+  };
+
+  const playSOSBeep = () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.frequency.value = 900;
+      gain.gain.value = 0.6;
+      const now = ctx.currentTime;
+      oscillator.start(now);
+      oscillator.stop(now + 0.4);
+    } catch (e) {
+      console.error('Beep error:', e);
+    }
+  };
+
   const handleJoinRide = async () => {
     if (!user) return;
-
-    if (isFull) {
-      setSnackbar({ open: true, message: 'Sorry, this ride is already full.', severity: 'error' });
-      return;
-    }
-
     setActionLoading(true);
     try {
       const participantData = {
@@ -121,14 +179,6 @@ export default function RideDetails() {
       const currentParticipants = currentRide.participants || [];
       const alreadyJoined = currentParticipants.some(p => p.userId === user.uid);
       if (alreadyJoined) { setActionLoading(false); return; }
-
-      // Double-check capacity at write time
-      if (currentParticipants.length >= (currentRide.maxParticipants || 10)) {
-        setSnackbar({ open: true, message: 'Sorry, this ride just filled up.', severity: 'error' });
-        setActionLoading(false);
-        return;
-      }
-
       await updateDoc(rideRef, { participants: [...currentParticipants, participantData] });
       await fetchRideDetails();
       await sendNotification(
@@ -153,7 +203,6 @@ export default function RideDetails() {
       setShowJoinSuccessDialog(true);
     } catch (error) {
       console.error('Error joining ride:', error);
-      setSnackbar({ open: true, message: 'Failed to join ride. Please try again.', severity: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -504,7 +553,7 @@ export default function RideDetails() {
                 </Button>
               ) : (
                 <Button variant="contained" startIcon={<Person />} onClick={handleJoinRide} disabled={actionLoading || isFull}
-                  sx={{ flex: 1, bgcolor: isFull ? '#94a3b8' : '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: isFull ? '#94a3b8' : '#6d28d9' }, '&:disabled': { bgcolor: '#cbd5e1' } }}>
+                  sx={{ flex: 1, bgcolor: '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: '#6d28d9' }, '&:disabled': { bgcolor: '#cbd5e1' } }}>
                   {actionLoading ? <CircularProgress size={24} color="inherit" /> : isFull ? 'Ride Full' : 'Join Ride'}
                 </Button>
               )}
@@ -544,6 +593,69 @@ export default function RideDetails() {
       </Box>
 
       {/* ── ALL DIALOGS ── */}
+
+      {/* ── SOS ALERT OVERLAY — shown to all participants when SOS is active ── */}
+      {sosAlert && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            bgcolor: 'rgba(0,0,0,0.85)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 3,
+          }}
+        >
+          {/* Pulsing red circle */}
+          <Box
+            sx={{
+              width: 140, height: 140, borderRadius: '50%',
+              bgcolor: '#ef4444',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              mb: 3,
+              animation: 'sosPulse 1s infinite',
+              '@keyframes sosPulse': {
+                '0%, 100%': { transform: 'scale(1)', opacity: 1 },
+                '50%': { transform: 'scale(1.15)', opacity: 0.8 },
+              },
+            }}
+          >
+            <Typography variant="h3" sx={{ fontWeight: 700, color: 'white' }}>SOS</Typography>
+          </Box>
+
+          <Typography variant="h5" sx={{ fontWeight: 700, color: 'white', mb: 1, textAlign: 'center' }}>
+            🚨 Emergency Alert!
+          </Typography>
+          <Typography variant="body1" sx={{ color: '#fca5a5', mb: 3, textAlign: 'center', fontSize: '1.1rem' }}>
+            <strong style={{ color: 'white' }}>{sosAlert.triggeredByName}</strong> has triggered an SOS
+          </Typography>
+
+          {sosAlert.mapsLink && (
+            <Button
+              variant="contained"
+              href={sosAlert.mapsLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                bgcolor: '#4CAF50', color: 'white',
+                fontWeight: 700, textTransform: 'none',
+                borderRadius: 3, px: 4, py: 1.5, mb: 2,
+                fontSize: '1rem',
+                '&:hover': { bgcolor: '#388E3C' },
+              }}
+            >
+              📍 Open Their Location in Maps
+            </Button>
+          )}
+
+          <Typography variant="body2" sx={{ color: '#94a3b8', textAlign: 'center' }}>
+            This alert will clear when the SOS is resolved
+          </Typography>
+        </Box>
+      )}
 
       <RouteMapViewer open={showMapViewer} onClose={() => setShowMapViewer(false)} meetingPoint={ride.meetingPoint} destination={ride.destination} meetingPointCoords={ride.meetingPointCoords} destinationCoords={ride.destinationCoords} />
 
@@ -626,7 +738,7 @@ export default function RideDetails() {
         </DialogActions>
       </Dialog>
 
-      {/* Cancel Success Dialog */}
+      {/* ── Cancel Success Dialog ── */}
       <Dialog open={showCancelSuccessDialog} onClose={() => { setShowCancelSuccessDialog(false); navigate('/dashboard'); }} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
@@ -647,7 +759,7 @@ export default function RideDetails() {
         </DialogActions>
       </Dialog>
 
-      {/* Cancel Error Dialog */}
+      {/* ── Cancel Error Dialog ── */}
       <Dialog open={showCancelErrorDialog} onClose={() => setShowCancelErrorDialog(false)} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
@@ -700,22 +812,6 @@ export default function RideDetails() {
           </Box>
         </DialogContent>
       </Dialog>
-
-      {/* Snackbar for toast notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          sx={{ width: '100%', borderRadius: 2, fontWeight: 600 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
 
     </Box>
   );

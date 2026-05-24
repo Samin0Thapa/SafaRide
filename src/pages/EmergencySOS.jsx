@@ -166,6 +166,7 @@ export default function EmergencySOS() {
 
           // Write SOS event to Firestore
           try {
+            const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
             const sosRef = await addDoc(
               collection(db, 'rides', activeRide.id, 'sosEvents'),
               {
@@ -175,7 +176,7 @@ export default function EmergencySOS() {
                 lat: latitude,
                 lng: longitude,
                 accuracy,
-                mapsLink: `https://www.google.com/maps?q=${latitude},${longitude}`,
+                mapsLink,
                 timestamp: serverTimestamp(),
                 status: 'active',
                 rideId: activeRide.id,
@@ -183,19 +184,42 @@ export default function EmergencySOS() {
               }
             );
             setSosDocId(sosRef.id);
+
+            // Write sosActive flag to the ride document so all participants
+            // who have RideDetails open get the real-time alert via onSnapshot
+            await updateDoc(doc(db, 'rides', activeRide.id), {
+              sosActive: true,
+              sosTriggeredBy: user.uid,
+              sosTriggeredByName: user.displayName || 'Unknown',
+              sosMapsLink: mapsLink,
+              sosTimestamp: serverTimestamp(),
+            });
+
             resolve({ location, sosDocId: sosRef.id });
           } catch (err) {
             console.error('Error saving SOS to Firestore:', err);
             resolve({ location, sosDocId: null });
           }
         },
-        (error) => {
+        async (error) => {
           setGpsLoading(false);
           // GPS denied or unavailable — still activate SOS, just without coords
           if (error.code === error.PERMISSION_DENIED) {
             setLocationError('Location permission denied. SOS sent without GPS coordinates.');
           } else {
             setLocationError('Could not get GPS location. SOS sent without coordinates.');
+          }
+          // Still write sosActive to ride doc so other participants get the alert
+          try {
+            await updateDoc(doc(db, 'rides', activeRide.id), {
+              sosActive: true,
+              sosTriggeredBy: user.uid,
+              sosTriggeredByName: user.displayName || 'Unknown',
+              sosMapsLink: null,
+              sosTimestamp: serverTimestamp(),
+            });
+          } catch (err) {
+            console.error('Error writing SOS flag:', err);
           }
           resolve(null);
         },
