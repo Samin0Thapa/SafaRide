@@ -77,7 +77,6 @@ export default function RideDetails() {
     const unsubscribe = onSnapshot(doc(db, 'rides', rideId), (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
-      console.log('Ride snapshot fired:', data.sosActive, data.sosTriggeredBy);
 
       // Only show alert to OTHER participants, not the one who triggered it
       if (data.sosActive && data.sosTriggeredBy !== user.uid) {
