@@ -58,6 +58,12 @@ export default function RideDetails() {
   const [actionLoading, setActionLoading] = useState(false);
   const [isParticipant, setIsParticipant] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+
+  // SOS real-time alert state
+  const [sosAlert, setSosAlert] = useState(null);
+  const audioContextRef = useRef(null);
+  const beepIntervalRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
