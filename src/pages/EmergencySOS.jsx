@@ -295,44 +295,49 @@ export default function EmergencySOS() {
   };
 
   const handleStopSOS = async () => {
-    stopContinuousBeep();
+  stopContinuousBeep();
 
-    // ── Mark SOS event as resolved in Firestore ──
-    if (sosDocId && activeRide) {
-      try {
+  if (activeRide) {
+    try {
+      await updateDoc(doc(db, 'rides', activeRide.id), {
+        sosActive: false,
+        sosTriggeredBy: null,
+        sosTriggeredByName: null,
+        sosMapsLink: null,
+      });
+      if (sosDocId) {
         await updateDoc(
           doc(db, 'rides', activeRide.id, 'sosEvents', sosDocId),
           { status: 'resolved', resolvedAt: serverTimestamp() }
         );
-      } catch (err) {
-        console.error('Error resolving SOS in Firestore:', err);
       }
+    } catch (err) {
+      console.error('Error clearing SOS:', err);
     }
+  }
 
-    // ── Notify all participants SOS is resolved ──
-    if (participants.length > 0) {
-      participants.forEach(async (participant) => {
-        if (participant.id !== user?.uid) {
-          await sendNotification(
-            participant.id,
-            'sos_resolved',
-            '✅ SOS Resolved',
-            `${user?.displayName || 'A rider'} is safe. SOS has been resolved on "${activeRide?.title}"`,
-            activeRide?.id
-          );
-        }
-      });
-    }
+  if (participants.length > 0) {
+    participants.forEach(async (participant) => {
+      if (participant.id !== user?.uid) {
+        await sendNotification(
+          participant.id,
+          'sos_resolved',
+          '✅ SOS Resolved',
+          `${user?.displayName || 'A rider'} is safe. SOS has been resolved on "${activeRide?.title}"`,
+          activeRide?.id
+        );
+      }
+    });
+  }
 
-    setSOSActive(false);
-    setShowParticipantsDialog(false);
-    setSosLocation(null);
-    setSosDocId(null);
-    setLocationError('');
-    console.log('✅ SOS STOPPED');
+  setSOSActive(false);
+  setShowParticipantsDialog(false);
+  setSosLocation(null);
+  setSosDocId(null);
+  setLocationError('');
 
-    setTimeout(() => { navigate(-1); }, 500);
-  };
+  setTimeout(() => { navigate(-1); }, 500);
+};
 
   const handleShowContacts = (participant) => {
     setSelectedParticipant(participant);
