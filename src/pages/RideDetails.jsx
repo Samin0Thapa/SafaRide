@@ -85,7 +85,7 @@ export default function RideDetails() {
       const data = snapshot.data();
 
       // Only show alert to OTHER participants, not the one who triggered it
-      if (data.sosActive && data.sosTriggeredBy !== user.uid) {
+      if (data.sosActive && user && data.sosTriggeredBy !== user.uid) {
         setSosAlert({
           triggeredByName: data.sosTriggeredByName || 'A rider',
           mapsLink: data.sosMapsLink || null,
