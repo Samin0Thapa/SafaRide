@@ -87,6 +87,14 @@ export default function CreateRide() {
       setError('Please fill in all required fields');
       return;
     }
+    // Past date check
+    const selectedDate = new Date(formData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      setError('Ride date cannot be in the past. Please select a future date.');
+      return;
+    }
 
     if (!user) {
       setError('You must be logged in to create a ride');
