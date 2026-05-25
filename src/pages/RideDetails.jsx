@@ -59,6 +59,7 @@ export default function RideDetails() {
   const [isParticipant, setIsParticipant] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [organizerData, setOrganizerData] = useState(null);
 
   // SOS real-time alert state
   const [sosAlert, setSosAlert] = useState(null);
@@ -76,15 +77,24 @@ export default function RideDetails() {
     fetchRideDetails();
   }, [rideId]);
 
-  // Real-time SOS listener — watches the ride doc for sosActive flag
+  // Fetch organizer data when ride loads
+  useEffect(() => {
+    if (ride?.createdBy) {
+      getDoc(doc(db, 'users', ride.createdBy)).then((snap) => {
+        if (snap.exists()) setOrganizerData(snap.data());
+      });
+    }
+  }, [ride]);
+
+  // Real-time SOS listener
   useEffect(() => {
     if (!rideId || !user) return;
 
     const unsubscribe = onSnapshot(doc(db, 'rides', rideId), (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
+      console.log('Ride snapshot fired:', data.sosActive, data.sosTriggeredBy);
 
-      // Only show alert to OTHER participants, not the one who triggered it
       if (data.sosActive && user && data.sosTriggeredBy !== user.uid) {
         setSosAlert({
           triggeredByName: data.sosTriggeredByName || 'A rider',
@@ -92,7 +102,6 @@ export default function RideDetails() {
         });
         startSOSBeepAndVibrate();
       } else if (!data.sosActive) {
-        // SOS was resolved — clear alert and stop beeping
         setSosAlert(null);
         stopSOSBeepAndVibrate();
       }
@@ -130,10 +139,8 @@ export default function RideDetails() {
   };
 
   const startSOSBeepAndVibrate = () => {
-    // Play immediately then repeat every second
     playSOSBeep();
     if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
-
     beepIntervalRef.current = setInterval(() => {
       playSOSBeep();
       if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
@@ -185,6 +192,10 @@ export default function RideDetails() {
       const currentParticipants = currentRide.participants || [];
       const alreadyJoined = currentParticipants.some(p => p.userId === user.uid);
       if (alreadyJoined) { setActionLoading(false); return; }
+      if (currentParticipants.length >= (currentRide.maxParticipants || 10)) {
+        setActionLoading(false);
+        return;
+      }
       await updateDoc(rideRef, { participants: [...currentParticipants, participantData] });
       await fetchRideDetails();
       await sendNotification(
@@ -418,10 +429,13 @@ export default function RideDetails() {
             </Box>
           </Box>
 
+          {/* Rating + Riders row — now uses real data */}
           <Box sx={{ display: 'flex', gap: 3, pt: 2, borderTop: '1px solid #f1f5f9' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Star sx={{ fontSize: 20, color: '#f59e0b' }} />
-              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>4.8</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                {ride.rating ? ride.rating.toFixed(1) : '—'}
+              </Typography>
               <Typography variant="body2" sx={{ color: '#94a3b8' }}>Rating</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -447,7 +461,7 @@ export default function RideDetails() {
           <ChevronRight sx={{ color: '#cbd5e1' }} />
         </Box>
 
-        {/* Organizer Card */}
+        {/* Organizer Card — now uses real organizer data */}
         <Box sx={{ bgcolor: 'white', borderRadius: 5, p: 2.5, mb: 2, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 2 }}>Organizer</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -457,10 +471,14 @@ export default function RideDetails() {
             <Box sx={{ flex: 1 }}>
               <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.25 }}>{ride.createdByName}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} sx={{ fontSize: 14, color: '#fbbf24' }} />
-                ))}
-                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem', ml: 0.5 }}>4.8 • 52 rides</Typography>
+                {organizerData?.rating ? (
+                  <Star sx={{ fontSize: 14, color: '#fbbf24' }} />
+                ) : null}
+                <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem', ml: 0.5 }}>
+                  {organizerData?.rating
+                    ? `${organizerData.rating.toFixed(1)} • ${organizerData.totalRides ?? 0} rides`
+                    : 'No rating yet'}
+                </Typography>
               </Box>
             </Box>
             <IconButton sx={{ bgcolor: '#f3e8ff', color: '#7c3aed', '&:hover': { bgcolor: '#e9d5ff' } }}>
@@ -559,7 +577,7 @@ export default function RideDetails() {
                 </Button>
               ) : (
                 <Button variant="contained" startIcon={<Person />} onClick={handleJoinRide} disabled={actionLoading || isFull}
-                  sx={{ flex: 1, bgcolor: '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: '#6d28d9' }, '&:disabled': { bgcolor: '#cbd5e1' } }}>
+                  sx={{ flex: 1, bgcolor: isFull ? '#94a3b8' : '#7c3aed', color: 'white', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, '&:hover': { bgcolor: isFull ? '#94a3b8' : '#6d28d9' }, '&:disabled': { bgcolor: '#cbd5e1' } }}>
                   {actionLoading ? <CircularProgress size={24} color="inherit" /> : isFull ? 'Ride Full' : 'Join Ride'}
                 </Button>
               )}
@@ -594,13 +612,10 @@ export default function RideDetails() {
               )}
             </Box>
           )}
-
         </Container>
       </Box>
 
-      {/* ── ALL DIALOGS ── */}
-
-      {/* ── SOS ALERT OVERLAY — shown to all participants when SOS is active ── */}
+      {/* SOS ALERT OVERLAY */}
       {sosAlert && (
         <Box
           sx={{
@@ -615,7 +630,6 @@ export default function RideDetails() {
             p: 3,
           }}
         >
-          {/* Pulsing red circle */}
           <Box
             sx={{
               width: 140, height: 140, borderRadius: '50%',
@@ -631,14 +645,12 @@ export default function RideDetails() {
           >
             <Typography variant="h3" sx={{ fontWeight: 700, color: 'white' }}>SOS</Typography>
           </Box>
-
           <Typography variant="h5" sx={{ fontWeight: 700, color: 'white', mb: 1, textAlign: 'center' }}>
             🚨 Emergency Alert!
           </Typography>
           <Typography variant="body1" sx={{ color: '#fca5a5', mb: 3, textAlign: 'center', fontSize: '1.1rem' }}>
             <strong style={{ color: 'white' }}>{sosAlert.triggeredByName}</strong> has triggered an SOS
           </Typography>
-
           {sosAlert.mapsLink && (
             <Button
               variant="contained"
@@ -656,7 +668,6 @@ export default function RideDetails() {
               📍 Open Their Location in Maps
             </Button>
           )}
-
           <Typography variant="body2" sx={{ color: '#94a3b8', textAlign: 'center' }}>
             This alert will clear when the SOS is resolved
           </Typography>
@@ -744,7 +755,7 @@ export default function RideDetails() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Cancel Success Dialog ── */}
+      {/* Cancel Success */}
       <Dialog open={showCancelSuccessDialog} onClose={() => { setShowCancelSuccessDialog(false); navigate('/dashboard'); }} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
@@ -753,9 +764,7 @@ export default function RideDetails() {
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Ride Cancelled</Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', pb: 1 }}>
-          <Typography variant="body2" sx={{ color: '#64748b' }}>
-            The ride has been cancelled and all participants have been notified.
-          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>The ride has been cancelled and all participants have been notified.</Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
           <Button variant="contained" onClick={() => { setShowCancelSuccessDialog(false); navigate('/dashboard'); }}
@@ -765,7 +774,7 @@ export default function RideDetails() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Cancel Error Dialog ── */}
+      {/* Cancel Error */}
       <Dialog open={showCancelErrorDialog} onClose={() => setShowCancelErrorDialog(false)} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
@@ -774,9 +783,7 @@ export default function RideDetails() {
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Failed to Cancel</Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', pb: 1 }}>
-          <Typography variant="body2" sx={{ color: '#64748b' }}>
-            Something went wrong while cancelling the ride. Please try again.
-          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>Something went wrong while cancelling the ride. Please try again.</Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
           <Button variant="contained" onClick={() => setShowCancelErrorDialog(false)}

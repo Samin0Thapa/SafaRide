@@ -579,7 +579,7 @@ export default function Dashboard() {
             </Box>
             <Box sx={{ textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate('/chat')}>
               <IconButton sx={{ color: '#94a3b8' }}>
-                <Badge badgeContent={2} color="error"><Message /></Badge>
+                <Message />
               </IconButton>
               <Typography variant="caption" sx={{ display: 'block', color: '#94a3b8' }}>Chat</Typography>
             </Box>
