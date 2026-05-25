@@ -302,17 +302,22 @@ export default function Signup() {
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center' }}>
-          <Typography variant="body1" sx={{ color: '#64748b', mb: 2 }}>
-            We've sent a verification email to:
+          <Typography variant="body1" sx={{ color: '#64748b', mb: 1.5 }}>
+            A verification link has been sent to:
           </Typography>
-          <Typography variant="body1" sx={{ fontWeight: 600, mb: 2 }}>
+          <Typography variant="body1" sx={{ fontWeight: 700, color: '#7c3aed', mb: 2, wordBreak: 'break-all' }}>
             {formData.email}
           </Typography>
-          <Typography variant="body2" sx={{ color: '#64748b', mb: 1 }}>
-            Please check your inbox and click the verification link to activate your account.
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#f59e0b', fontWeight: 600 }}>
-            ⚠️ Check your spam/junk folder if you don't see it!
+
+          {/* Required — not optional */}
+          <Box sx={{ bgcolor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 2, p: 1.5, mb: 2 }}>
+            <Typography variant="body2" sx={{ color: '#92400e', fontWeight: 600 }}>
+              ⚠️ You must click the link in that email before you can log in.
+            </Typography>
+          </Box>
+
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Can't find it? Check your <strong>spam / junk</strong> folder.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
@@ -325,9 +330,7 @@ export default function Signup() {
               py: 1.5,
               textTransform: 'none',
               fontWeight: 600,
-              '&:hover': {
-                bgcolor: '#6d28d9',
-              },
+              '&:hover': { bgcolor: '#6d28d9' },
             }}
           >
             Go to Login
