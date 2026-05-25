@@ -5,32 +5,31 @@ import { auth, db } from '../services/firebase';
 import { Box, CircularProgress } from '@mui/material';
 
 export default function ProtectedAdminRoute({ children }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // stays true until Firebase confirms auth state
   const [isAdmin, setIsAdmin] = useState(false);
-  const user = auth.currentUser;
 
   useEffect(() => {
-    checkAdminStatus();
-  }, [user]);
-
-  const checkAdminStatus = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        setIsAdmin(userData.role === 'admin');
+    // onAuthStateChanged fires once Firebase has restored the session from storage.
+    // auth.currentUser is null synchronously on refresh — never read it outside this callback.
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          setIsAdmin(userDoc.data().role === 'admin');
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []); // empty deps — runs once on mount, waits for Firebase
 
   if (loading) {
     return (
@@ -48,7 +47,7 @@ export default function ProtectedAdminRoute({ children }) {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 
