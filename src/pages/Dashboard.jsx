@@ -359,7 +359,9 @@ export default function Dashboard() {
               <Typography variant="body2" sx={{ opacity: 0.9 }}>Rating</Typography>
             </Box>
             <Box sx={{ textAlign: 'center', bgcolor: 'rgba(167, 139, 250, 0.3)', borderRadius: 3, py: 2, px: 3, flex: 1 }}>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>0</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                {(totalRides >= 1 ? 1 : 0) + (totalRides >= 5 ? 1 : 0) + (userRole === 'organizer' || userRole === 'admin' ? 1 : 0)}
+              </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>Badges</Typography>
             </Box>
           </Box>
@@ -474,9 +476,7 @@ export default function Dashboard() {
                     <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>Connect with riders</Typography>
                   </Box>
                 </Box>
-                <Badge badgeContent={3} color="error">
-                  <Box sx={{ width: 24, height: 24 }} />
-                </Badge>
+                <ArrowForward sx={{ color: '#cbd5e1', fontSize: 20 }} />
               </Box>
             </CardContent>
           </Card>

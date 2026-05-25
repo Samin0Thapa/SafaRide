@@ -113,10 +113,9 @@ export default function OrganizerVerificationForm() {
     }
   };
 
-  // FIX #1 — was '/become-organizer'
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false);
-    navigate('/trust-verification');
+    navigate('/become-organizer');
   };
 
   return (
@@ -138,10 +137,9 @@ export default function OrganizerVerificationForm() {
           color: 'white',
         }}
       >
-        {/* Back Button + Title — FIX #2: was '/become-organizer' */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <IconButton
-            onClick={() => navigate('/trust-verification')}
+            onClick={() => navigate('/become-organizer')}
             sx={{ color: 'white', p: 0 }}
             disabled={loading}
           >

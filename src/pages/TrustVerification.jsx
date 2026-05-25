@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../services/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
 import {
   Box,
   Container,
@@ -27,6 +27,7 @@ export default function TrustVerification() {
   const navigate = useNavigate();
   const user = auth.currentUser;
   const [userData, setUserData] = useState(null);
+  const [rideStats, setRideStats] = useState({ total: 0, completed: 0, organized: 0, completionRate: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,22 +39,32 @@ export default function TrustVerification() {
   const fetchUserData = async () => {
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        setUserData(userDoc.data());
-      } else {
-        setUserData({
-          displayName: user.displayName || 'User',
-          email: user.email,
-          verified: false,
-          isOrganizer: false,
-          totalRides: 0,
-          completedRides: 0,
-          organizedRides: 0,
-          completionRate: 0,
-          rating: 0,
-          memberSince: new Date().getFullYear().toString(),
-        });
-      }
+      const firestoreData = userDoc.exists() ? userDoc.data() : {
+        displayName: user.displayName || 'User',
+        email: user.email,
+        verified: false,
+        rating: 0,
+      };
+      setUserData(firestoreData);
+
+      // Compute real ride stats by scanning all rides
+      const allRidesSnap = await getDocs(collection(db, 'rides'));
+      let total = 0, completed = 0, organized = 0;
+      allRidesSnap.forEach((d) => {
+        const ride = d.data();
+        const isCreator = ride.createdBy === user.uid;
+        const isParticipant = Array.isArray(ride.participants) &&
+          ride.participants.some(p =>
+            (typeof p === 'object' && p.userId === user.uid) || p === user.uid
+          );
+        if (isCreator || isParticipant) {
+          total++;
+          if (ride.status === 'completed') completed++;
+        }
+        if (isCreator) organized++;
+      });
+      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+      setRideStats({ total, completed, organized, completionRate });
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
@@ -132,7 +143,7 @@ export default function TrustVerification() {
 
             {/* User Name */}
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-              {userData?.displayName || user?.displayName || 'User'}
+              {userData?.name || userData?.displayName || user?.displayName || 'User'}
             </Typography>
 
             {/* Member Since */}
@@ -244,7 +255,7 @@ export default function TrustVerification() {
                 <DirectionsBike sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.totalRides ?? 0}
+                {rideStats.total}
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Total Rides
@@ -276,7 +287,7 @@ export default function TrustVerification() {
                 <CheckCircle sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.completedRides ?? 0}
+                {rideStats.completed}
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Completed Rides
@@ -308,7 +319,7 @@ export default function TrustVerification() {
                 <Flag sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.organizedRides ?? 0}
+                {rideStats.organized}
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Organized
@@ -340,7 +351,7 @@ export default function TrustVerification() {
                 <Percent sx={{ fontSize: 24, color: '#7c3aed' }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-                {userData?.completionRate ?? 0}%
+                {rideStats.completionRate}%
               </Typography>
               <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
                 Completion Rate
@@ -428,43 +439,43 @@ export default function TrustVerification() {
           </CardContent>
         </Card>
 
-        {/* Request Organizer Role Button */}
-        <Button
-          fullWidth
-          variant="contained"
-          size="large"
-          onClick={() => navigate('/verification-form')}
-          sx={{
-            bgcolor: '#7c3aed',
-            color: 'white',
-            py: 1.75,
-            fontSize: '1rem',
-            fontWeight: 600,
-            textTransform: 'none',
-            borderRadius: 3,
-            boxShadow: 'none',
-            mb: 1.5,
-            '&:hover': {
-              bgcolor: '#6d28d9',
-            },
-          }}
-        >
-          Request Organizer Role
-        </Button>
-
-        {/* Footer Text */}
-        <Typography
-          variant="caption"
-          sx={{
-            color: '#94a3b8',
-            textAlign: 'center',
-            display: 'block',
-            px: 2,
-            lineHeight: 1.5,
-          }}
-        >
-          Verified organizers can create rides and gain community trust.
-        </Typography>
+        {/* Request Organizer Role Button — hidden for already-verified/organizer/admin */}
+        {userData?.role !== 'organizer' && userData?.role !== 'admin' && !userData?.verified ? (
+          <>
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              onClick={() => navigate('/verification-form')}
+              sx={{
+                bgcolor: '#7c3aed',
+                color: 'white',
+                py: 1.75,
+                fontSize: '1rem',
+                fontWeight: 600,
+                textTransform: 'none',
+                borderRadius: 3,
+                boxShadow: 'none',
+                mb: 1.5,
+                '&:hover': { bgcolor: '#6d28d9' },
+              }}
+            >
+              Request Organizer Role
+            </Button>
+            <Typography variant="caption" sx={{ color: '#94a3b8', textAlign: 'center', display: 'block', px: 2, lineHeight: 1.5 }}>
+              Verified organizers can create rides and gain community trust.
+            </Typography>
+          </>
+        ) : (
+          <Box sx={{ textAlign: 'center', bgcolor: '#dcfce7', borderRadius: 3, py: 2.5, px: 3 }}>
+            <Typography variant="body1" sx={{ fontWeight: 700, color: '#16a34a', mb: 0.5 }}>
+              ✅ You are a Verified Organizer
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#15803d' }}>
+              You can create rides and are trusted by the community.
+            </Typography>
+          </Box>
+        )}
       </Container>
     </Box>
   );

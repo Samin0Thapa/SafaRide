@@ -12,6 +12,7 @@ import {
   signOut,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  updateProfile,
 } from 'firebase/auth';
 import {
   Box,
@@ -110,9 +111,12 @@ export default function Settings() {
     if (!newName.trim()) return;
     setNameLoading(true);
     try {
+      // Update Firestore profile
       await updateDoc(doc(db, 'users', user.uid), {
         name: newName.trim(),
       });
+      // Also update Firebase Auth displayName so Dashboard/Profile header reflects immediately
+      await updateProfile(user, { displayName: newName.trim() });
       setNameSuccess(true);
       setShowEditNameDialog(false);
       setTimeout(() => setNameSuccess(false), 3000);

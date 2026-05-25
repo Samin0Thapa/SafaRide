@@ -58,6 +58,7 @@ export default function AdminDashboard() {
   const [showRidesDialog, setShowRidesDialog] = useState(false);
   const [showRideDetailsDialog, setShowRideDetailsDialog] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedRequestUserStats, setSelectedRequestUserStats] = useState({ rating: null, totalRides: 0 });
   const [selectedOrganizer, setSelectedOrganizer] = useState(null);
   const [selectedRide, setSelectedRide] = useState(null);
   const [ridesTab, setRidesTab] = useState(0);
@@ -148,9 +149,32 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleViewDetails = (request) => {
+  const handleViewDetails = async (request) => {
     setSelectedRequest(request);
+    setSelectedRequestUserStats({ rating: null, totalRides: 0 });
     setShowRequestDetailsDialog(true);
+    // Fetch real stats for this user
+    try {
+      const userDoc = await getDoc(doc(db, 'users', request.userId));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+      const allRidesSnap = await getDocs(collection(db, 'rides'));
+      let rideCount = 0;
+      allRidesSnap.forEach((d) => {
+        const ride = d.data();
+        const isCreator = ride.createdBy === request.userId;
+        const isParticipant = Array.isArray(ride.participants) &&
+          ride.participants.some(p =>
+            (typeof p === 'object' && p.userId === request.userId) || p === request.userId
+          );
+        if (isCreator || isParticipant) rideCount++;
+      });
+      setSelectedRequestUserStats({
+        rating: userData.rating ?? null,
+        totalRides: rideCount,
+      });
+    } catch (e) {
+      console.error('Error fetching user stats for admin view:', e);
+    }
   };
 
   const handleApprove = async () => {
@@ -410,12 +434,16 @@ export default function AdminDashboard() {
 
             <Box sx={{ display: 'flex', justifyContent: 'space-around', bgcolor: '#f8fafc', borderRadius: 3, p: 2, mb: 3 }}>
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#7c3aed', mb: 0.5 }}>4.8</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#7c3aed', mb: 0.5 }}>
+                  {selectedRequestUserStats.rating !== null ? selectedRequestUserStats.rating.toFixed(1) : '—'}
+                </Typography>
                 <Typography variant="caption" sx={{ color: '#64748b' }}>Trust Score</Typography>
               </Box>
               <Divider orientation="vertical" flexItem />
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#4f46e5', mb: 0.5 }}>47</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#4f46e5', mb: 0.5 }}>
+                  {selectedRequestUserStats.totalRides}
+                </Typography>
                 <Typography variant="caption" sx={{ color: '#64748b' }}>Total Rides</Typography>
               </Box>
             </Box>

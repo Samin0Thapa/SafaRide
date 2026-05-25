@@ -366,7 +366,8 @@ export default function EmergencySOS() {
 
   const playBeepAndVibrate = () => {
     playBeep();
-    if ('vibrate' in navigator) navigator.vibrate(300);
+    // Triple-pulse pattern — more noticeable across different Android devices
+    if ('vibrate' in navigator) navigator.vibrate([300, 100, 300, 100, 300]);
   };
 
   const playBeep = () => {
