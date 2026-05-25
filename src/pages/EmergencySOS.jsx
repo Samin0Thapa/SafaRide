@@ -295,8 +295,14 @@ export default function EmergencySOS() {
   };
 
   const handleStopSOS = async () => {
-  console.log('STOP pressed, activeRide:', activeRide?.id, 'sosDocId:', sosDocId);
+  console.log('STOP pressed, activeRide:', activeRide?.id);
+  
+  // Stop beeping immediately
   stopContinuousBeep();
+  setSOSActive(false);
+  setShowParticipantsDialog(false);
+
+  // Write to Firestore FIRST before any navigation
   if (activeRide) {
     try {
       await updateDoc(doc(db, 'rides', activeRide.id), {
@@ -305,6 +311,8 @@ export default function EmergencySOS() {
         sosTriggeredByName: null,
         sosMapsLink: null,
       });
+      console.log('SOS cleared in Firestore');
+
       if (sosDocId) {
         await updateDoc(
           doc(db, 'rides', activeRide.id, 'sosEvents', sosDocId),
@@ -316,6 +324,7 @@ export default function EmergencySOS() {
     }
   }
 
+  // Send resolved notifications
   if (participants.length > 0) {
     participants.forEach(async (participant) => {
       if (participant.id !== user?.uid) {
@@ -323,20 +332,19 @@ export default function EmergencySOS() {
           participant.id,
           'sos_resolved',
           '✅ SOS Resolved',
-          `${user?.displayName || 'A rider'} is safe. SOS has been resolved on "${activeRide?.title}"`,
+          `${user?.displayName || 'A rider'} is safe. SOS resolved on "${activeRide?.title}"`,
           activeRide?.id
         );
       }
     });
   }
 
-  setSOSActive(false);
-  setShowParticipantsDialog(false);
   setSosLocation(null);
   setSosDocId(null);
   setLocationError('');
 
-  setTimeout(() => { navigate(-1); }, 500);
+  // Navigate AFTER Firestore write is confirmed
+  navigate(-1);
 };
 
   const handleShowContacts = (participant) => {
