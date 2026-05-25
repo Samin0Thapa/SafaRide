@@ -295,8 +295,8 @@ export default function EmergencySOS() {
   };
 
   const handleStopSOS = async () => {
+  console.log('STOP pressed, activeRide:', activeRide?.id, 'sosDocId:', sosDocId);
   stopContinuousBeep();
-
   if (activeRide) {
     try {
       await updateDoc(doc(db, 'rides', activeRide.id), {
