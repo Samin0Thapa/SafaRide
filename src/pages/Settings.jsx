@@ -42,7 +42,6 @@ import {
   Logout,
   Edit,
   CheckCircle,
-  Warning,
   Info,
 } from '@mui/icons-material';
 
@@ -67,7 +66,6 @@ export default function Settings() {
   // Notification toggles
   const [notifSettings, setNotifSettings] = useState({
     rideUpdates: true,
-    sosAlerts: true,
     verificationUpdates: true,
     newReviews: true,
   });
@@ -317,21 +315,6 @@ export default function Settings() {
                 checked={notifSettings.rideUpdates}
                 onChange={() => handleNotifToggle('rideUpdates')}
                 sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#7c3aed' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#7c3aed' } }}
-              />
-            }
-          />
-          <Divider sx={{ mx: 2 }} />
-          <SettingsRow
-            icon={<Warning />}
-            label="SOS Alerts"
-            subtitle="Emergency alerts from ride participants"
-            color="#ef4444"
-            bgColor="#fee2e2"
-            rightElement={
-              <Switch
-                checked={notifSettings.sosAlerts}
-                onChange={() => handleNotifToggle('sosAlerts')}
-                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#ef4444' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#ef4444' } }}
               />
             }
           />

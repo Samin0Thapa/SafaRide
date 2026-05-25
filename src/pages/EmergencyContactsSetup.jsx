@@ -475,7 +475,7 @@ export default function EmergencyContactsSetup() {
             fullWidth
             variant="contained"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !isValid}
             sx={{
               bgcolor: '#7c3aed',
               color: 'white',

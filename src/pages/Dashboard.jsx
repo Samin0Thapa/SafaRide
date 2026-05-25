@@ -73,6 +73,11 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const [notifSettings, setNotifSettings] = useState({
+    rideUpdates: true,
+    verificationUpdates: true,
+    newReviews: true,
+  });
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -90,6 +95,21 @@ export default function Dashboard() {
     fetchUserStats();
     subscribeToNotifications();
   }, [user]);
+
+  // Types that are controlled by notification settings
+  const RIDE_UPDATE_TYPES = ['ride_joined', 'ride_left', 'ride_started', 'ride_completed', 'ride_cancelled'];
+  const VERIFICATION_TYPES = ['verification_approved', 'verification_rejected'];
+  const REVIEW_TYPES = ['new_review'];
+
+  const filterNotifsBySettings = (notifs, settings) => {
+    return notifs.filter(n => {
+      if (RIDE_UPDATE_TYPES.includes(n.type)) return settings.rideUpdates !== false;
+      if (VERIFICATION_TYPES.includes(n.type)) return settings.verificationUpdates !== false;
+      if (REVIEW_TYPES.includes(n.type)) return settings.newReviews !== false;
+      // SOS alerts and anything else always show
+      return true;
+    });
+  };
 
   const subscribeToNotifications = () => {
     const q = query(
@@ -136,7 +156,8 @@ export default function Dashboard() {
 
   const handleOpenNotifications = () => {
     setShowNotificationsDialog(true);
-    if (unreadCount > 0) markAllAsRead();
+    const visibleUnread = filterNotifsBySettings(notifications, notifSettings).filter(n => !n.read).length;
+    if (visibleUnread > 0) markAllAsRead();
   };
 
   const fetchOngoingRides = async () => {
@@ -181,6 +202,10 @@ export default function Dashboard() {
         setUserRating(data.rating || null);
         // KEY LINE — check emergency contacts
         setHasEmergencyContacts((data.emergencyContacts?.length ?? 0) >= 1);
+        // Load notification preferences
+        if (data.notificationSettings) {
+          setNotifSettings(prev => ({ ...prev, ...data.notificationSettings }));
+        }
       }
     } catch (error) {
       console.error('Error fetching user stats:', error);
@@ -335,7 +360,7 @@ export default function Dashboard() {
                 onClick={handleOpenNotifications}
                 sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
               >
-                <Badge badgeContent={unreadCount} color="error">
+                <Badge badgeContent={filterNotifsBySettings(notifications, notifSettings).filter(n => !n.read).length} color="error">
                   <Notifications />
                 </Badge>
               </IconButton>
@@ -592,55 +617,61 @@ export default function Dashboard() {
       </Box>
 
       {/* Notifications Dialog */}
-      <Dialog open={showNotificationsDialog} onClose={() => setShowNotificationsDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4, m: 2, maxHeight: '80vh' } }}>
-        <DialogTitle sx={{ pb: 1, pt: 2.5, px: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Notifications</Typography>
-              {unreadCount > 0 && (
-                <Chip label={`${unreadCount} new`} size="small" sx={{ bgcolor: '#ef4444', color: 'white', fontWeight: 700, fontSize: '0.75rem' }} />
-              )}
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {notifications.some(n => !n.read) && (
-                <Button size="small" startIcon={<DoneAll sx={{ fontSize: 16 }} />} onClick={markAllAsRead} sx={{ textTransform: 'none', color: '#7c3aed', fontWeight: 600, fontSize: '0.8rem' }}>
-                  Mark all read
-                </Button>
-              )}
-              <IconButton onClick={() => setShowNotificationsDialog(false)} size="small" sx={{ color: '#64748b' }}><Close /></IconButton>
-            </Box>
-          </Box>
-        </DialogTitle>
-        <Divider />
-        <DialogContent sx={{ px: 0, py: 0 }}>
-          {notifications.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 8 }}>
-              <NotificationsNone sx={{ fontSize: 70, color: '#cbd5e1', mb: 2 }} />
-              <Typography variant="body1" sx={{ fontWeight: 600, color: '#64748b', mb: 0.5 }}>No notifications yet</Typography>
-              <Typography variant="body2" sx={{ color: '#94a3b8' }}>Activity from your rides will appear here</Typography>
-            </Box>
-          ) : (
-            <Box>
-              {notifications.map((notif, index) => (
-                <Box key={notif.id}>
-                  <Box onClick={() => markAsRead(notif.id)} sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, px: 3, py: 2, bgcolor: notif.read ? 'white' : '#faf5ff', cursor: 'pointer', transition: 'background 0.2s', '&:hover': { bgcolor: '#f5f3ff' }, borderLeft: notif.read ? 'none' : '3px solid #7c3aed' }}>
-                    <Box sx={{ width: 44, height: 44, borderRadius: '50%', bgcolor: getNotifColor(notif.type), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '1.3rem' }}>
-                      {getNotifIcon(notif.type)}
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: notif.read ? 500 : 700, color: '#1e293b', mb: 0.25, fontSize: '0.9rem' }}>{notif.title}</Typography>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.82rem', mb: 0.5, lineHeight: 1.4 }}>{notif.message}</Typography>
-                      <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>{formatNotifTime(notif.createdAt)}</Typography>
-                    </Box>
-                    {!notif.read && <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#7c3aed', flexShrink: 0, mt: 0.5 }} />}
-                  </Box>
-                  {index < notifications.length - 1 && <Divider />}
+      {(() => {
+        const visibleNotifs = filterNotifsBySettings(notifications, notifSettings);
+        const visibleUnread = visibleNotifs.filter(n => !n.read).length;
+        return (
+          <Dialog open={showNotificationsDialog} onClose={() => setShowNotificationsDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4, m: 2, maxHeight: '80vh' } }}>
+            <DialogTitle sx={{ pb: 1, pt: 2.5, px: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Notifications</Typography>
+                  {visibleUnread > 0 && (
+                    <Chip label={`${visibleUnread} new`} size="small" sx={{ bgcolor: '#ef4444', color: 'white', fontWeight: 700, fontSize: '0.75rem' }} />
+                  )}
                 </Box>
-              ))}
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {visibleNotifs.some(n => !n.read) && (
+                    <Button size="small" startIcon={<DoneAll sx={{ fontSize: 16 }} />} onClick={markAllAsRead} sx={{ textTransform: 'none', color: '#7c3aed', fontWeight: 600, fontSize: '0.8rem' }}>
+                      Mark all read
+                    </Button>
+                  )}
+                  <IconButton onClick={() => setShowNotificationsDialog(false)} size="small" sx={{ color: '#64748b' }}><Close /></IconButton>
+                </Box>
+              </Box>
+            </DialogTitle>
+            <Divider />
+            <DialogContent sx={{ px: 0, py: 0 }}>
+              {visibleNotifs.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 8 }}>
+                  <NotificationsNone sx={{ fontSize: 70, color: '#cbd5e1', mb: 2 }} />
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#64748b', mb: 0.5 }}>No notifications yet</Typography>
+                  <Typography variant="body2" sx={{ color: '#94a3b8' }}>Activity from your rides will appear here</Typography>
+                </Box>
+              ) : (
+                <Box>
+                  {visibleNotifs.map((notif, index) => (
+                    <Box key={notif.id}>
+                      <Box onClick={() => markAsRead(notif.id)} sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, px: 3, py: 2, bgcolor: notif.read ? 'white' : '#faf5ff', cursor: 'pointer', transition: 'background 0.2s', '&:hover': { bgcolor: '#f5f3ff' }, borderLeft: notif.read ? 'none' : '3px solid #7c3aed' }}>
+                        <Box sx={{ width: 44, height: 44, borderRadius: '50%', bgcolor: getNotifColor(notif.type), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '1.3rem' }}>
+                          {getNotifIcon(notif.type)}
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: notif.read ? 500 : 700, color: '#1e293b', mb: 0.25, fontSize: '0.9rem' }}>{notif.title}</Typography>
+                          <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.82rem', mb: 0.5, lineHeight: 1.4 }}>{notif.message}</Typography>
+                          <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>{formatNotifTime(notif.createdAt)}</Typography>
+                        </Box>
+                        {!notif.read && <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#7c3aed', flexShrink: 0, mt: 0.5 }} />}
+                      </Box>
+                      {index < visibleNotifs.length - 1 && <Divider />}
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* Verification Required Dialog */}
       <Dialog open={showVerificationDialog} onClose={() => setShowVerificationDialog(false)} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '400px' } }}>

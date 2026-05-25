@@ -55,6 +55,7 @@ export default function RideDetails() {
   const [showCompleteConfirmDialog, setShowCompleteConfirmDialog] = useState(false);
   const [showCancelSuccessDialog, setShowCancelSuccessDialog] = useState(false);
   const [showCancelErrorDialog, setShowCancelErrorDialog] = useState(false);
+  const [showNoContactsDialog, setShowNoContactsDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [isParticipant, setIsParticipant] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
@@ -177,6 +178,20 @@ export default function RideDetails() {
 
   const handleJoinRide = async () => {
     if (!user) return;
+
+    // ── EMERGENCY CONTACTS GATE ───────────────────────────────────────────────
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const emergencyContacts = userDoc.data()?.emergencyContacts || [];
+      if (emergencyContacts.length < 2) {
+        setShowNoContactsDialog(true);
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not check emergency contacts:', e);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     setActionLoading(true);
     try {
       const participantData = {
@@ -824,6 +839,30 @@ export default function RideDetails() {
             ))}
           </Box>
         </DialogContent>
+      </Dialog>
+
+      {/* No Emergency Contacts Dialog */}
+      <Dialog open={showNoContactsDialog} onClose={() => setShowNoContactsDialog(false)} PaperProps={{ sx: { borderRadius: 4, px: 2, py: 1, maxWidth: '380px' } }}>
+        <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
+          <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', mb: 2 }}>
+            <WarningIcon sx={{ fontSize: 50, color: '#f97316' }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Emergency Contacts Required</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', pb: 1 }}>
+          <Typography variant="body2" sx={{ color: '#64748b', mb: 1 }}>
+            You need at least <strong>2 emergency contacts</strong> before joining a ride. This ensures someone can be reached in case of an emergency.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
+          <Button onClick={() => setShowNoContactsDialog(false)} sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={() => { setShowNoContactsDialog(false); navigate('/emergency-contacts'); }}
+            sx={{ bgcolor: '#7c3aed', px: 3, py: 1.5, textTransform: 'none', fontWeight: 600, borderRadius: 2, '&:hover': { bgcolor: '#6d28d9' } }}>
+            Set Up Contacts
+          </Button>
+        </DialogActions>
       </Dialog>
 
     </Box>
