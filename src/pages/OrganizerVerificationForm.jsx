@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth, storage } from '../services/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth } from '../services/firebase';
 import {
   Box,
   Container,
@@ -41,7 +40,7 @@ export default function OrganizerVerificationForm() {
     motorcycleModel: '',
     reason: '',
   });
-  const [idDocument, setIdDocument] = useState(null);
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -52,18 +51,6 @@ export default function OrganizerVerificationForm() {
       [e.target.name]: e.target.value,
     });
     if (error) setError('');
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5000000) { // 5MB limit
-        setError('File size must be less than 5MB');
-        return;
-      }
-      setIdDocument(file);
-      setError('');
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -105,7 +92,7 @@ export default function OrganizerVerificationForm() {
         licenseNumber: formData.licenseNumber,
         motorcycleModel: formData.motorcycleModel,
         reason: formData.reason,
-        documentURL: idDocument ? idDocument.name : 'Document upload pending', // Temporary placeholder
+        documentURL: 'Not required',
         status: 'pending',
         createdAt: serverTimestamp(),
       };
@@ -463,45 +450,6 @@ export default function OrganizerVerificationForm() {
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                   }}
                 />
-              </Box>
-
-              {/* ID Document Upload */}
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                  ID Document Upload (Optional for now)
-                </Typography>
-                <Box
-                  sx={{
-                    border: '2px dashed #cbd5e1',
-                    borderRadius: 3,
-                    p: 4,
-                    textAlign: 'center',
-                    bgcolor: '#f9fafb',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      borderColor: '#7c3aed',
-                      bgcolor: '#f3e8ff',
-                    },
-                  }}
-                  onClick={() => document.getElementById('file-upload').click()}
-                >
-                  <input
-                    id="file-upload"
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                    disabled={loading}
-                  />
-                  <CloudUpload sx={{ fontSize: 48, color: '#7c3aed', mb: 1 }} />
-                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                    {idDocument ? idDocument.name : 'Upload Documents Here'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                    Click to upload your ID or license (Max 5MB)
-                  </Typography>
-                </Box>
               </Box>
             </Box>
           </CardContent>
