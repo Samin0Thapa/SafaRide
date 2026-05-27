@@ -75,8 +75,12 @@ export default function Login() {
         formData.password
       );
 
-      // ── EMAIL VERIFICATION GATE ──────────────────────────────────────────
-      if (!userCredential.user.emailVerified) {
+      // Fetch user document to check role before verification gate
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const isAdmin = userDoc.exists() && userDoc.data().role === 'admin';
+
+      // ── EMAIL VERIFICATION GATE (admins bypass) ──────────────────────────
+      if (!userCredential.user.emailVerified && !isAdmin) {
         // Sign them back out immediately — unverified users cannot enter the app
         await signOut(auth);
         // Store credentials in memory only (for the resend button this session)
@@ -87,8 +91,7 @@ export default function Login() {
       }
       // ────────────────────────────────────────────────────────────────────
 
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      if (userDoc.exists() && userDoc.data().role === 'admin') {
+      if (isAdmin) {
         navigate('/admin/dashboard');
       } else {
         navigate('/dashboard');

@@ -19,6 +19,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import CreateRide from "./pages/CreateRide";
+import EditRide from "./pages/EditRide";
 import JoinRide from "./pages/JoinRide";
 import RideDetails from "./pages/RideDetails";
 import Profile from "./pages/Profile";
@@ -224,6 +225,7 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-ride" element={<CreateRide />} />
+          <Route path="/edit-ride/:rideId" element={<EditRide />} />
           <Route path="/join-ride" element={<JoinRide />} />
           <Route path="/ride-details/:rideId" element={<RideDetails />} />
           <Route path="/profile" element={<Profile />} />

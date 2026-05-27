@@ -3,7 +3,12 @@
     "allow": [
       "Bash(python -c ' *)",
       "Bash(npx vite *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Read(//c/Users/N I T R O 5/.claude/projects/c--Sem6-FYP-Project-SafaRide-frontend-SafaRide/memory/**)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Sem6\\\\FYP\\\\Project\\\\SafaRide_frontend\\\\SafaRide\" -Filter \"*.pdf\" -o -Filter \"*.docx\")",
+      "Bash(Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Sem6\\\\FYP\\\\Project\\\\SafaRide_frontend\\\\SafaRide\" -Recurse | Where-Object { $_.Name -match \"Report|report\" })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Sem6\\\\FYP\\\\Project\\\\SafaRide_frontend\\\\SafaRide\" | Where-Object { $_.Extension -eq \".pdf\" -or $_.Extension -eq \".docx\" } | Select-Object Name, Length, LastWriteTime)"
     ]
   }
 }

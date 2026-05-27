@@ -38,6 +38,7 @@ import {
   Cancel,
   CheckCircleOutline,
   Warning as WarningIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 
 export default function RideDetails() {
@@ -559,6 +560,10 @@ export default function RideDetails() {
           {/* ORGANIZER - Upcoming */}
           {isOrganizer && rideStatus === 'upcoming' && (
             <>
+              <Button variant="outlined" startIcon={<EditIcon />} onClick={() => navigate(`/edit-ride/${rideId}`)} disabled={actionLoading}
+                sx={{ flex: 1, color: '#7c3aed', borderColor: '#7c3aed', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, borderWidth: 2, '&:hover': { borderColor: '#6d28d9', bgcolor: 'transparent', borderWidth: 2 } }}>
+                Edit
+              </Button>
               <Button variant="outlined" startIcon={<Cancel />} onClick={() => setShowCancelConfirmDialog(true)} disabled={actionLoading}
                 sx={{ flex: 1, color: '#ef4444', borderColor: '#ef4444', py: 1.5, fontSize: '0.95rem', fontWeight: 600, textTransform: 'none', borderRadius: 4, borderWidth: 2, '&:hover': { borderColor: '#dc2626', bgcolor: 'transparent', borderWidth: 2 } }}>
                 Cancel Ride
