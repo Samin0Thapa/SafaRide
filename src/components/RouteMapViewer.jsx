@@ -39,18 +39,28 @@ const redIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
-// Component to fit map bounds around both markers
-function FitBounds({ meetingPointCoords, destinationCoords }) {
+// Blue marker for the participant's current location
+const blueIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+// Component to fit map bounds around all relevant markers
+function FitBounds({ meetingPointCoords, destinationCoords, myLocation }) {
   const map = useMap();
   useEffect(() => {
-    if (meetingPointCoords && destinationCoords) {
-      const bounds = L.latLngBounds(
-        [meetingPointCoords.lat, meetingPointCoords.lng],
-        [destinationCoords.lat, destinationCoords.lng]
-      );
-      map.fitBounds(bounds, { padding: [40, 40] });
+    const points = [];
+    if (meetingPointCoords) points.push([meetingPointCoords.lat, meetingPointCoords.lng]);
+    if (destinationCoords) points.push([destinationCoords.lat, destinationCoords.lng]);
+    if (myLocation) points.push([myLocation.lat, myLocation.lng]);
+    if (points.length >= 2) {
+      map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
     }
-  }, [meetingPointCoords, destinationCoords]);
+  }, [meetingPointCoords, destinationCoords, myLocation]);
   return null;
 }
 
@@ -65,12 +75,76 @@ export default function RouteMapViewer({
   const [routePoints, setRoutePoints] = useState([]);
   const [loadingRoute, setLoadingRoute] = useState(false);
 
+  // "Your route to meetup" state
+  const [myLocation, setMyLocation] = useState(null);
+  const [myRoutePoints, setMyRoutePoints] = useState([]);
+  const [loadingMyRoute, setLoadingMyRoute] = useState(false);
+  const [myRouteError, setMyRouteError] = useState('');
+
   // Fetch route from OSRM (free routing service)
   useEffect(() => {
     if (open && meetingPointCoords && destinationCoords) {
       fetchRoute();
     }
   }, [open, meetingPointCoords, destinationCoords]);
+
+  // Reset the "your route" state whenever the dialog closes
+  useEffect(() => {
+    if (!open) {
+      setMyLocation(null);
+      setMyRoutePoints([]);
+      setMyRouteError('');
+      setLoadingMyRoute(false);
+    }
+  }, [open]);
+
+  // Capture current GPS position, then fetch the route from there to the meeting point
+  const handleShowMyRoute = () => {
+    setMyRouteError('');
+    if (!('geolocation' in navigator)) {
+      setMyRouteError('Location is not supported on this device.');
+      return;
+    }
+    if (!meetingPointCoords) {
+      setMyRouteError('This ride has no meeting point coordinates.');
+      return;
+    }
+    setLoadingMyRoute(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const loc = { lat: latitude, lng: longitude };
+        setMyLocation(loc);
+        try {
+          const response = await fetch(
+            `https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${meetingPointCoords.lng},${meetingPointCoords.lat}?overview=full&geometries=geojson`
+          );
+          const data = await response.json();
+          if (data.routes && data.routes.length > 0) {
+            const points = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+            setMyRoutePoints(points);
+          } else {
+            // Fallback — straight line from current location to meeting point
+            setMyRoutePoints([[latitude, longitude], [meetingPointCoords.lat, meetingPointCoords.lng]]);
+          }
+        } catch (err) {
+          console.error('My-route fetch error:', err);
+          setMyRoutePoints([[latitude, longitude], [meetingPointCoords.lat, meetingPointCoords.lng]]);
+        } finally {
+          setLoadingMyRoute(false);
+        }
+      },
+      (error) => {
+        setLoadingMyRoute(false);
+        if (error.code === error.PERMISSION_DENIED) {
+          setMyRouteError('Location permission denied. Allow location to see your route to the meetup.');
+        } else {
+          setMyRouteError('Could not get your location. Please try again.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  };
 
   const fetchRoute = async () => {
     setLoadingRoute(true);
@@ -155,10 +229,22 @@ export default function RouteMapViewer({
               <FitBounds
                 meetingPointCoords={meetingPointCoords}
                 destinationCoords={destinationCoords}
+                myLocation={myLocation}
               />
             )}
 
-            {/* Route polyline */}
+            {/* Your route to meetup (current location → meeting point) */}
+            {myRoutePoints.length > 0 && (
+              <Polyline
+                positions={myRoutePoints}
+                color="#22c55e"
+                weight={5}
+                opacity={0.85}
+                dashArray="8, 8"
+              />
+            )}
+
+            {/* Group ride route (meeting point → destination) */}
             {routePoints.length > 0 && (
               <Polyline
                 positions={routePoints}
@@ -166,6 +252,16 @@ export default function RouteMapViewer({
                 weight={5}
                 opacity={0.8}
               />
+            )}
+
+            {/* Your current location marker */}
+            {myLocation && (
+              <Marker position={[myLocation.lat, myLocation.lng]} icon={blueIcon}>
+                <Popup>
+                  <strong>🧍 You are here</strong><br />
+                  Route to the meeting point
+                </Popup>
+              </Marker>
             )}
 
             {/* Meeting Point Marker */}
@@ -195,6 +291,49 @@ export default function RouteMapViewer({
             )}
           </MapContainer>
         </Box>
+
+        {/* Show My Route to Meetup */}
+        <Button
+          onClick={handleShowMyRoute}
+          variant="outlined"
+          fullWidth
+          disabled={loadingMyRoute || !meetingPointCoords}
+          startIcon={loadingMyRoute ? <CircularProgress size={18} sx={{ color: '#22c55e' }} /> : <MyLocation />}
+          sx={{
+            color: '#16a34a',
+            borderColor: '#22c55e',
+            borderWidth: 2,
+            py: 1.4,
+            mt: 2,
+            textTransform: 'none',
+            fontWeight: 600,
+            borderRadius: 2,
+            '&:hover': { borderColor: '#16a34a', bgcolor: 'rgba(34,197,94,0.06)', borderWidth: 2 },
+          }}
+        >
+          {myRoutePoints.length > 0 ? 'Update My Route to Meetup' : 'Show My Route to Meetup'}
+        </Button>
+
+        {/* My-route error */}
+        {myRouteError && (
+          <Typography variant="body2" sx={{ color: '#dc2626', textAlign: 'center', mt: 1, fontSize: '0.85rem' }}>
+            {myRouteError}
+          </Typography>
+        )}
+
+        {/* Legend for the two route colours (shown once a personal route exists) */}
+        {myRoutePoints.length > 0 && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mt: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Box sx={{ width: 20, height: 3, bgcolor: '#22c55e', borderRadius: 1 }} />
+              <Typography variant="caption" sx={{ color: '#64748b' }}>You → Meetup</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Box sx={{ width: 20, height: 3, bgcolor: '#7c3aed', borderRadius: 1 }} />
+              <Typography variant="caption" sx={{ color: '#64748b' }}>Meetup → Destination</Typography>
+            </Box>
+          </Box>
+        )}
 
         {/* Close Button */}
         <Button
