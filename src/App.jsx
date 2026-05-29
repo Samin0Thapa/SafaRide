@@ -11,7 +11,6 @@ import {
   query,
   where,
   onSnapshot,
-  getDocs,
 } from 'firebase/firestore';
 
 import Home from "./pages/Home";
@@ -84,57 +83,53 @@ function App() {
       return;
     }
 
-    // Watch ALL active SOS alerts
+    // Watch ALL rides with an active SOS flag.
+    // EmergencySOS.jsx sets sosActive=true on the ride document — this is the
+    // single source of truth for an active emergency.
     const sosQuery = query(
-      collection(db, 'sosAlerts'),
-      where('status', '==', 'active')
+      collection(db, 'rides'),
+      where('sosActive', '==', true)
     );
 
-    const unsubscribeSOS = onSnapshot(sosQuery, async (snapshot) => {
+    const unsubscribeSOS = onSnapshot(sosQuery, (snapshot) => {
       let foundRelevantSOS = null;
 
       for (const docSnap of snapshot.docs) {
-        const sosData = { id: docSnap.id, ...docSnap.data() };
+        const ride = { id: docSnap.id, ...docSnap.data() };
 
-        // Skip our own SOS (we're already on the SOS page)
-        if (sosData.userId === currentUser.uid) continue;
+        // Skip the SOS we triggered ourselves (we're already on the SOS page)
+        if (ride.sosTriggeredBy === currentUser.uid) continue;
 
-        // Check if this SOS is for a ride we're part of
-        try {
-          const ridesSnap = await getDocs(
-            query(collection(db, 'rides'), where('__name__', '==', sosData.rideId))
+        // Only alert if we're part of this ride
+        const isCreator = ride.createdBy === currentUser.uid;
+        const isParticipant = Array.isArray(ride.participants) &&
+          ride.participants.some(p =>
+            (typeof p === 'object' && p.userId === currentUser.uid) || p === currentUser.uid
           );
-          if (ridesSnap.empty) continue;
 
-          const ride = ridesSnap.docs[0].data();
-          const isCreator = ride.createdBy === currentUser.uid;
-          const isParticipant = Array.isArray(ride.participants) &&
-            ride.participants.some(p =>
-              (typeof p === 'object' && p.userId === currentUser.uid) || p === currentUser.uid
-            );
+        if (!isCreator && !isParticipant) continue;
 
-          if (!isCreator && !isParticipant) continue;
-
-          // This SOS is relevant to us — is it new?
-          if (!seenSOSIds.current.has(sosData.id)) {
-            seenSOSIds.current.add(sosData.id);
-            // Trigger immediate alert
-            triggerGlobalSOSAlert();
-          }
-
-          foundRelevantSOS = {
-            rideTitle: ride.title || 'a ride',
-            triggeredBy: sosData.userName || 'A rider',
-            mapsLink: sosData.location
-              ? `https://www.google.com/maps?q=${sosData.location.lat},${sosData.location.lng}`
-              : null,
-            rideId: sosData.rideId,
-          };
-          break; // show banner for first relevant SOS
-        } catch (e) {
-          console.warn('Error checking SOS ride membership:', e);
+        // This SOS is relevant to us — is it new since the last alert?
+        if (!seenSOSIds.current.has(ride.id)) {
+          seenSOSIds.current.add(ride.id);
+          triggerGlobalSOSAlert();
         }
+
+        foundRelevantSOS = {
+          rideTitle: ride.title || 'a ride',
+          triggeredBy: ride.sosTriggeredByName || 'A rider',
+          mapsLink: ride.sosMapsLink || null,
+          rideId: ride.id,
+        };
+        break; // show banner for first relevant SOS
       }
+
+      // When a ride's sosActive flips back to false, drop it from seen-set so a
+      // future SOS on the same ride alerts again.
+      const activeIds = new Set(snapshot.docs.map((d) => d.id));
+      seenSOSIds.current.forEach((id) => {
+        if (!activeIds.has(id)) seenSOSIds.current.delete(id);
+      });
 
       setActiveSOS(foundRelevantSOS);
 

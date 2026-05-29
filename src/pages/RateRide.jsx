@@ -70,6 +70,7 @@ export default function RateRide() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [alreadyRated, setAlreadyRated] = useState(false);
+  const [isOwnRide, setIsOwnRide] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState('');
   const [rideRating, setRideRating] = useState(0);
@@ -95,7 +96,12 @@ export default function RateRide() {
       setLoading(true);
       const rideDoc = await getDoc(doc(db, 'rides', rideId));
       if (rideDoc.exists()) {
-        setRide({ id: rideDoc.id, ...rideDoc.data() });
+        const data = rideDoc.data();
+        setRide({ id: rideDoc.id, ...data });
+        // Organizers cannot rate their own ride
+        if (auth.currentUser && data.createdBy === auth.currentUser.uid) {
+          setIsOwnRide(true);
+        }
       } else {
         setError('Ride not found.');
       }
@@ -169,6 +175,36 @@ export default function RateRide() {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <CircularProgress sx={{ color: '#7c3aed' }} />
+      </Box>
+    );
+  }
+
+  if (isOwnRide) {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
+        <Box sx={{ background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)', borderRadius: '0 0 30px 30px', px: 3, pt: 3, pb: 6, color: 'white' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton onClick={() => navigate(-1)} sx={{ color: 'white', p: 0 }}>
+              <ArrowBack />
+            </IconButton>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Rate Ride</Typography>
+          </Box>
+        </Box>
+        <Container maxWidth="sm" sx={{ mt: -4, px: 2, position: 'relative', zIndex: 10 }}>
+          <Card sx={{ borderRadius: 4, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', textAlign: 'center', p: 4 }}>
+            <Person sx={{ fontSize: 80, color: '#7c3aed', mb: 2 }} />
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 1 }}>This Is Your Ride</Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>Organizers cannot rate their own ride. You can view feedback from participants on your profile.</Typography>
+            <Button fullWidth variant="contained" onClick={() => navigate('/profile')}
+              sx={{ bgcolor: '#7c3aed', py: 1.5, textTransform: 'none', fontWeight: 600, borderRadius: 3, mb: 1.5, '&:hover': { bgcolor: '#6d28d9' } }}>
+              View My Reviews
+            </Button>
+            <Button fullWidth variant="outlined" onClick={() => navigate('/dashboard')}
+              sx={{ color: '#7c3aed', borderColor: '#7c3aed', py: 1.5, textTransform: 'none', fontWeight: 600, borderRadius: 3, '&:hover': { borderColor: '#6d28d9', bgcolor: 'rgba(124,58,237,0.05)' } }}>
+              Back to Dashboard
+            </Button>
+          </Card>
+        </Container>
       </Box>
     );
   }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import {
   Box,
   Container,
@@ -39,14 +39,29 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('recent');
   const [totalRides, setTotalRides] = useState(0);
+  const [reviews, setReviews] = useState([]);
 
   useEffect(() => {
     if (user) {
       fetchUserData();
       fetchRecentRides();
       fetchTotalRides();
+      fetchReviews();
     }
   }, [user]);
+
+  const fetchReviews = async () => {
+    try {
+      const q = query(collection(db, 'reviews'), where('organizerId', '==', user.uid));
+      const snap = await getDocs(q);
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Sort newest first (client-side to avoid composite index requirement)
+      list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setReviews(list);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    }
+  };
 
   const fetchUserData = async () => {
     try {
@@ -252,8 +267,8 @@ export default function Profile() {
         </Card>
 
         {/* Tabs */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-          {['recent', 'badges'].map((tab) => (
+        <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+          {['recent', 'reviews', 'badges'].map((tab) => (
             <Button
               key={tab}
               variant={activeTab === tab ? 'contained' : 'outlined'}
@@ -264,11 +279,11 @@ export default function Profile() {
                 color: activeTab === tab ? 'white' : '#7c3aed',
                 borderColor: '#7c3aed',
                 py: 1.5, borderRadius: 5,
-                textTransform: 'none', fontWeight: 600,
+                textTransform: 'none', fontWeight: 600, fontSize: '0.85rem',
                 '&:hover': { bgcolor: activeTab === tab ? '#6d28d9' : 'rgba(124,58,237,0.05)', borderColor: '#7c3aed' },
               }}
             >
-              {tab === 'recent' ? 'Recent Rides' : 'Badges'}
+              {tab === 'recent' ? 'Rides' : tab === 'reviews' ? `Reviews (${reviews.length})` : 'Badges'}
             </Button>
           ))}
         </Box>
@@ -304,6 +319,49 @@ export default function Profile() {
               <Box sx={{ textAlign: 'center', py: 4, mb: 10 }}>
                 <DirectionsBike sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
                 <Typography variant="body2" sx={{ color: '#64748b' }}>No recent rides yet</Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Reviews */}
+        {activeTab === 'reviews' && (
+          <Box sx={{ mb: 8 }}>
+            {reviews.length > 0 ? reviews.map((review) => (
+              <Card key={review.id} sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                    <Avatar sx={{ width: 40, height: 40, bgcolor: '#7c3aed', fontSize: '1rem', fontWeight: 700 }}>
+                      {review.reviewerName?.charAt(0)?.toUpperCase() || 'U'}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>
+                        {review.reviewerName || 'Anonymous'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 0.25 }}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} sx={{ fontSize: 16, color: s <= (review.organizerRating || 0) ? '#f59e0b' : '#e2e8f0' }} />
+                        ))}
+                      </Box>
+                    </Box>
+                    {review.createdAt?.seconds && (
+                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        {formatDate(new Date(review.createdAt.seconds * 1000))}
+                      </Typography>
+                    )}
+                  </Box>
+                  {review.comment && (
+                    <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.6, mt: 1 }}>
+                      "{review.comment}"
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            )) : (
+              <Box sx={{ textAlign: 'center', py: 4, mb: 10 }}>
+                <Star sx={{ fontSize: 60, color: '#cbd5e1', mb: 2 }} />
+                <Typography variant="body1" sx={{ fontWeight: 600, color: '#64748b', mb: 0.5 }}>No reviews yet</Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8' }}>Reviews from riders will appear here after your rides are completed and rated.</Typography>
               </Box>
             )}
           </Box>
