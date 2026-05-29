@@ -674,9 +674,7 @@ export default function RideDetails() {
           {sosAlert.mapsLink && (
             <Button
               variant="contained"
-              href={sosAlert.mapsLink}
-              target="_blank"
-              rel="noopener noreferrer"
+              onClick={() => window.open(sosAlert.mapsLink, '_blank', 'noopener,noreferrer')}
               sx={{
                 bgcolor: '#4CAF50', color: 'white',
                 fontWeight: 700, textTransform: 'none',

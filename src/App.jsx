@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box, Typography, Button } from '@mui/material';
-import { Warning } from '@mui/icons-material';
 import theme from './theme';
 import { useState, useEffect, useRef } from 'react';
 import { auth, db } from './services/firebase';
@@ -138,13 +137,20 @@ function App() {
           triggerGlobalSOSAlert();
         }
 
+        // Build a robust maps link: prefer the stored link, else build one from
+        // raw coords if present. Stays null only if GPS was never captured.
+        let mapsLink = ride.sosMapsLink || null;
+        if (!mapsLink && ride.sosLat != null && ride.sosLng != null) {
+          mapsLink = `https://www.google.com/maps?q=${ride.sosLat},${ride.sosLng}`;
+        }
+
         foundRelevantSOS = {
           rideTitle: ride.title || 'a ride',
           triggeredBy: ride.sosTriggeredByName || 'A rider',
-          mapsLink: ride.sosMapsLink || null,
+          mapsLink,
           rideId: ride.id,
         };
-        break; // show banner for first relevant SOS
+        break; // show alert for first relevant SOS
       }
 
       // When a ride's sosActive flips back to false, drop it from seen-set so a
@@ -185,55 +191,75 @@ function App() {
       <CssBaseline />
       <BrowserRouter>
 
-        {/* ── Global SOS Banner — shown on ANY page when a ride participant triggers SOS ── */}
+        {/* ── Global SOS Alert Overlay — full-screen, shown on ANY page ── */}
         {activeSOS && (
           <Box
             sx={{
               position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 9999,
-              bgcolor: '#dc2626',
-              color: 'white',
-              px: 2,
-              py: 1.5,
+              top: 0, left: 0, right: 0, bottom: 0,
+              bgcolor: 'rgba(0,0,0,0.85)',
+              zIndex: 99999,
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              gap: 1.5,
-              boxShadow: '0 4px 20px rgba(220,38,38,0.5)',
-              animation: 'sosFlash 1s infinite',
-              '@keyframes sosFlash': {
-                '0%, 100%': { bgcolor: '#dc2626' },
-                '50%': { bgcolor: '#991b1b' },
-              },
+              justifyContent: 'center',
+              p: 3,
             }}
           >
-            <Warning sx={{ fontSize: 24, flexShrink: 0 }} />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.2 }}>
-                🚨 SOS ALERT — {activeSOS.triggeredBy} needs help in "{activeSOS.rideTitle}"
-              </Typography>
+            <Box
+              sx={{
+                width: 140, height: 140, borderRadius: '50%',
+                bgcolor: '#ef4444',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                mb: 3,
+                animation: 'sosPulse 1s infinite',
+                '@keyframes sosPulse': {
+                  '0%, 100%': { transform: 'scale(1)', opacity: 1 },
+                  '50%': { transform: 'scale(1.15)', opacity: 0.8 },
+                },
+              }}
+            >
+              <Typography variant="h3" sx={{ fontWeight: 700, color: 'white' }}>SOS</Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
-              {activeSOS.mapsLink && (
-                <Button
-                  size="small"
-                  href={activeSOS.mapsLink}
-                  target="_blank"
-                  sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'none', px: 1.5, py: 0.5, minWidth: 'unset', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
-                >
-                  📍 Map
-                </Button>
-              )}
+            <Typography variant="h5" sx={{ fontWeight: 700, color: 'white', mb: 1, textAlign: 'center' }}>
+              🚨 Emergency Alert!
+            </Typography>
+            <Typography variant="body1" sx={{ color: '#fca5a5', mb: 1, textAlign: 'center', fontSize: '1.1rem' }}>
+              <strong style={{ color: 'white' }}>{activeSOS.triggeredBy}</strong> has triggered an SOS
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#fca5a5', mb: 3, textAlign: 'center' }}>
+              in "{activeSOS.rideTitle}"
+            </Typography>
+            {activeSOS.mapsLink && (
               <Button
-                size="small"
-                onClick={() => setActiveSOS(null)}
-                sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.15)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'none', px: 1.5, py: 0.5, minWidth: 'unset', '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}
+                variant="contained"
+                onClick={() => window.open(activeSOS.mapsLink, '_blank', 'noopener,noreferrer')}
+                sx={{
+                  bgcolor: '#4CAF50', color: 'white',
+                  fontWeight: 700, textTransform: 'none',
+                  borderRadius: 3, px: 4, py: 1.5, mb: 2,
+                  fontSize: '1rem',
+                  '&:hover': { bgcolor: '#388E3C' },
+                }}
               >
-                Dismiss
+                📍 Open Their Location in Maps
               </Button>
-            </Box>
+            )}
+            <Button
+              variant="outlined"
+              onClick={() => setActiveSOS(null)}
+              sx={{
+                color: 'white', borderColor: 'rgba(255,255,255,0.5)',
+                fontWeight: 600, textTransform: 'none',
+                borderRadius: 3, px: 4, py: 1, mb: 2,
+                '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              Dismiss
+            </Button>
+            <Typography variant="body2" sx={{ color: '#94a3b8', textAlign: 'center' }}>
+              This alert will clear when the SOS is resolved
+            </Typography>
           </Box>
         )}
 

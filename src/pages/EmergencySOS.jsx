@@ -192,6 +192,8 @@ export default function EmergencySOS() {
               sosTriggeredBy: user.uid,
               sosTriggeredByName: user.displayName || 'Unknown',
               sosMapsLink: mapsLink,
+              sosLat: latitude,
+              sosLng: longitude,
               sosTimestamp: serverTimestamp(),
             });
 
