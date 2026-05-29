@@ -27,6 +27,7 @@ import {
   DirectionsBike,
   Schedule,
   VerifiedUser,
+  Warning,
   Logout,
   Close,
   CalendarToday,
@@ -146,6 +147,31 @@ export default function AdminDashboard() {
       navigate('/');
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  };
+
+  // Clears the sosActive flag on every ride — kill switch for stuck/orphaned alerts
+  const handleClearAllSOS = async () => {
+    if (!window.confirm('Clear ALL active SOS alerts across every ride?')) return;
+    setActionLoading(true);
+    try {
+      const activeQuery = query(collection(db, 'rides'), where('sosActive', '==', true));
+      const snap = await getDocs(activeQuery);
+      await Promise.all(
+        snap.docs.map((d) =>
+          updateDoc(doc(db, 'rides', d.id), {
+            sosActive: false,
+            sosTriggeredBy: null,
+            sosMapsLink: null,
+          })
+        )
+      );
+      alert(`Cleared ${snap.size} active SOS alert(s).`);
+    } catch (error) {
+      console.error('Clear SOS error:', error);
+      alert('Failed to clear SOS alerts. Try again.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -352,9 +378,19 @@ export default function AdminDashboard() {
         <Button
           fullWidth variant="contained" startIcon={<DirectionsBike />}
           onClick={() => setShowRidesDialog(true)}
-          sx={{ bgcolor: '#7c3aed', color: 'white', py: 1.75, fontSize: '1rem', fontWeight: 600, textTransform: 'none', borderRadius: 3, mb: 3, boxShadow: '0 4px 12px rgba(124,58,237,0.3)', '&:hover': { bgcolor: '#6d28d9' } }}
+          sx={{ bgcolor: '#7c3aed', color: 'white', py: 1.75, fontSize: '1rem', fontWeight: 600, textTransform: 'none', borderRadius: 3, mb: 2, boxShadow: '0 4px 12px rgba(124,58,237,0.3)', '&:hover': { bgcolor: '#6d28d9' } }}
         >
           View Upcoming & Completed Rides
+        </Button>
+
+        {/* Clear All SOS Button — kill switch for stuck/orphaned alerts */}
+        <Button
+          fullWidth variant="outlined" startIcon={<Warning />}
+          onClick={handleClearAllSOS}
+          disabled={actionLoading}
+          sx={{ color: '#dc2626', borderColor: '#dc2626', borderWidth: 2, py: 1.75, fontSize: '1rem', fontWeight: 600, textTransform: 'none', borderRadius: 3, mb: 3, '&:hover': { borderColor: '#b91c1c', bgcolor: 'rgba(220,38,38,0.05)', borderWidth: 2 } }}
+        >
+          Clear All Active SOS Alerts
         </Button>
 
         {/* Pending Verification Requests */}

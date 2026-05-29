@@ -91,14 +91,37 @@ function App() {
       where('sosActive', '==', true)
     );
 
+    // Any SOS older than this is treated as stale/orphaned and ignored, so a
+    // forgotten alert can't haunt the app indefinitely.
+    const SOS_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
     const unsubscribeSOS = onSnapshot(sosQuery, (snapshot) => {
       let foundRelevantSOS = null;
+
+      // Suppress the global SOS banner on public/auth pages. A cached Firebase
+      // session can leave currentUser set while the login/home UI is showing.
+      const authPaths = ['/', '/login', '/signup'];
+      if (authPaths.includes(window.location.pathname)) {
+        setActiveSOS(null);
+        if (alertIntervalRef.current) {
+          clearInterval(alertIntervalRef.current);
+          alertIntervalRef.current = null;
+        }
+        return;
+      }
 
       for (const docSnap of snapshot.docs) {
         const ride = { id: docSnap.id, ...docSnap.data() };
 
         // Skip the SOS we triggered ourselves (we're already on the SOS page)
         if (ride.sosTriggeredBy === currentUser.uid) continue;
+
+        // Skip stale SOS — if it was triggered more than 30 min ago and never
+        // cleared, treat it as orphaned and do not alert.
+        if (ride.sosTimestamp?.seconds) {
+          const ageMs = Date.now() - ride.sosTimestamp.seconds * 1000;
+          if (ageMs > SOS_MAX_AGE_MS) continue;
+        }
 
         // Only alert if we're part of this ride
         const isCreator = ride.createdBy === currentUser.uid;
