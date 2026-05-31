@@ -366,10 +366,22 @@ export default function EmergencySOS() {
     }
   };
 
-  const playBeepAndVibrate = () => {
+  const playBeepAndVibrate = async () => {
     playBeep();
-    // Triple-pulse pattern — more noticeable across different Android devices
-    if ('vibrate' in navigator) navigator.vibrate([300, 100, 300, 100, 300]);
+    // Triple-pulse pattern — request permission on Android 10+
+    if ('vibrate' in navigator && 'permissions' in navigator) {
+      try {
+        const permission = await navigator.permissions.query({ name: 'vibrate' });
+        if (permission.state !== 'denied') {
+          navigator.vibrate([300, 100, 300, 100, 300]);
+        }
+      } catch (e) {
+        // Fallback for browsers without permission API
+        navigator.vibrate([300, 100, 300, 100, 300]);
+      }
+    } else if ('vibrate' in navigator) {
+      navigator.vibrate([300, 100, 300, 100, 300]);
+    }
   };
 
   const playBeep = () => {

@@ -54,9 +54,20 @@ function playGlobalBeep() {
   }
 }
 
-function triggerGlobalSOSAlert() {
-  // Vibration: triple-pulse pattern for better compatibility across Android devices
-  if ('vibrate' in navigator) {
+async function triggerGlobalSOSAlert() {
+  // Request vibration permission (required on Android 10+)
+  if ('vibrate' in navigator && 'permissions' in navigator) {
+    try {
+      const permission = await navigator.permissions.query({ name: 'vibrate' });
+      if (permission.state !== 'denied') {
+        navigator.vibrate([400, 150, 400, 150, 400]);
+      }
+    } catch (e) {
+      // Fallback for browsers that don't support permission API
+      navigator.vibrate([400, 150, 400, 150, 400]);
+    }
+  } else if ('vibrate' in navigator) {
+    // Old Android or browsers without permission API
     navigator.vibrate([400, 150, 400, 150, 400]);
   }
   playGlobalBeep();

@@ -140,12 +140,35 @@ export default function RideDetails() {
     }
   };
 
-  const startSOSBeepAndVibrate = () => {
+  const startSOSBeepAndVibrate = async () => {
     playSOSBeep();
-    if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
-    beepIntervalRef.current = setInterval(() => {
+    // Request vibration permission on Android 10+
+    if ('vibrate' in navigator && 'permissions' in navigator) {
+      try {
+        const permission = await navigator.permissions.query({ name: 'vibrate' });
+        if (permission.state !== 'denied') {
+          navigator.vibrate([500, 200, 500]);
+        }
+      } catch (e) {
+        navigator.vibrate([500, 200, 500]);
+      }
+    } else if ('vibrate' in navigator) {
+      navigator.vibrate([500, 200, 500]);
+    }
+    beepIntervalRef.current = setInterval(async () => {
       playSOSBeep();
-      if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
+      if ('vibrate' in navigator && 'permissions' in navigator) {
+        try {
+          const permission = await navigator.permissions.query({ name: 'vibrate' });
+          if (permission.state !== 'denied') {
+            navigator.vibrate([500, 200, 500]);
+          }
+        } catch (e) {
+          navigator.vibrate([500, 200, 500]);
+        }
+      } else if ('vibrate' in navigator) {
+        navigator.vibrate([500, 200, 500]);
+      }
     }, 1500);
   };
 
