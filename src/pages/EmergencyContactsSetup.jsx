@@ -429,31 +429,6 @@ export default function EmergencyContactsSetup() {
           </Box>
         </Box>
 
-        {/* Test SOS Button */}
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<Warning />}
-          onClick={() => navigate('/emergency-sos')}
-          sx={{
-            borderColor: '#ef4444',
-            color: '#ef4444',
-            py: 2,
-            fontSize: '1rem',
-            fontWeight: 600,
-            textTransform: 'none',
-            borderRadius: 4,
-            borderWidth: 2,
-            mb: 10,
-            '&:hover': {
-              borderColor: '#dc2626',
-              bgcolor: '#fef2f2',
-              borderWidth: 2,
-            },
-          }}
-        >
-          Test Emergency SOS
-        </Button>
       </Container>
 
       {/* Fixed Bottom Save Button */}

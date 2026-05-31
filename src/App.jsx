@@ -32,7 +32,7 @@ import GroupChat from './pages/GroupChat';
 import RateRide from './pages/RateRide';
 import Settings from "./pages/Settings";
 
-// ─── Global SOS alert helper ────────────────────────────────────────────────
+//Global SOS alert helper 
 function playGlobalBeep() {
   try {
     if (!window.audioContext) {

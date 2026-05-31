@@ -283,7 +283,7 @@ export default function EmergencySOS() {
           await sendNotification(
             participant.id,
             'sos_alert',
-            '🚨 SOS Alert!',
+            'SOS Alert',
             `${user?.displayName || 'A rider'} triggered an emergency SOS on "${activeRide?.title}".${locationText}`,
             activeRide?.id
           );
@@ -333,8 +333,8 @@ export default function EmergencySOS() {
         await sendNotification(
           participant.id,
           'sos_resolved',
-          '✅ SOS Resolved',
-          `${user?.displayName || 'A rider'} is safe. SOS resolved on "${activeRide?.title}"`,
+          'SOS Resolved',
+          `${user?.displayName || 'A rider'} is safe. SOS resolved.`,
           activeRide?.id
         );
       }

@@ -217,8 +217,8 @@ export default function RideDetails() {
       await sendNotification(
         currentRide.createdBy,
         'ride_joined',
-        '👤 New Participant',
-        `${user.displayName || 'Someone'} joined your ride "${currentRide.title}"`,
+        'New Participant Joined',
+        `${user.displayName || 'A rider'} joined your ride "${currentRide.title}"`,
         rideId
       );
       for (const p of currentParticipants) {
@@ -227,8 +227,8 @@ export default function RideDetails() {
           await sendNotification(
             participantId,
             'ride_joined',
-            '👤 Rider Joined',
-            `${user.displayName || 'Someone'} also joined "${currentRide.title}"`,
+            'Rider Joined Your Group',
+            `${user.displayName || 'A rider'} also joined "${currentRide.title}"`,
             rideId
           );
         }
@@ -251,8 +251,8 @@ export default function RideDetails() {
       await sendNotification(
         ride.createdBy,
         'ride_left',
-        '👋 Participant Left',
-        `${user.displayName || 'Someone'} left your ride "${ride.title}"`,
+        'Participant Left',
+        `${user.displayName || 'A rider'} left your ride "${ride.title}"`,
         rideId
       );
       for (const p of updatedParticipants) {
@@ -261,8 +261,8 @@ export default function RideDetails() {
           await sendNotification(
             participantId,
             'ride_left',
-            '👋 Rider Left',
-            `${user.displayName || 'Someone'} left "${ride.title}"`,
+            'Rider Left Your Group',
+            `${user.displayName || 'A rider'} left "${ride.title}"`,
             rideId
           );
         }
@@ -286,8 +286,8 @@ export default function RideDetails() {
           await sendNotification(
             participantId,
             'ride_started',
-            '🏍️ Ride Started!',
-            `"${ride.title}" has started. Get ready to ride!`,
+            'Ride Started',
+            `"${ride.title}" has started.`,
             rideId
           );
         }
@@ -311,8 +311,8 @@ export default function RideDetails() {
           await sendNotification(
             participantId,
             'ride_completed',
-            '✅ Ride Completed',
-            `"${ride.title}" has been completed. Rate your experience!`,
+            'Ride Completed',
+            `"${ride.title}" has been completed. You can now rate your experience.`,
             rideId
           );
         }
@@ -336,8 +336,8 @@ export default function RideDetails() {
           await sendNotification(
             participantId,
             'ride_cancelled',
-            '❌ Ride Cancelled',
-            `"${rideToCancel.title}" has been cancelled by the organizer`,
+            'Ride Cancelled',
+            `"${rideToCancel.title}" has been cancelled by the organizer.`,
             rideId
           );
         }

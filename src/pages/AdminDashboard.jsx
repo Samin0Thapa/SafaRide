@@ -218,8 +218,8 @@ export default function AdminDashboard() {
       await sendNotification(
         selectedRequest.userId,
         'verification_approved',
-        '✅ Verification Approved!',
-        'Congratulations! Your organizer verification has been approved. You can now create rides.',
+        'Verification Approved',
+        'Your organizer verification has been approved. You can now create rides.',
         null
       );
       await fetchDashboardData();
@@ -244,8 +244,8 @@ export default function AdminDashboard() {
       await sendNotification(
         selectedRequest.userId,
         'verification_rejected',
-        '❌ Verification Rejected',
-        'Your organizer verification request was rejected. You can reapply with updated documents.',
+        'Verification Rejected',
+        'Your organizer verification request was not approved. Please reapply with updated information.',
         null
       );
       await fetchDashboardData();
